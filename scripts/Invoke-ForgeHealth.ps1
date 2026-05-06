@@ -1,0 +1,120 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Quick','Offline','Live','Full')][string]$Mode = 'Offline',
+    [string]$RepoPath = "F:\develop\codex\playgrounds",
+    [int]$LiveMaxAgeHours = 24,
+    [string]$LiveRouteLogPath = "C:\Users\Administrator\.claude\logs\forge-smoke.jsonl",
+    [string]$RequiredClaudeVersion = "2.1.128",
+    [switch]$FetchUpstreams,
+    [int]$CheckTimeoutSeconds = 30,
+    [switch]$Json
+)
+$ErrorActionPreference = "Continue"
+$checks=@()
+
+function Add-CheckResult {
+    param([string]$Name,[bool]$Required,[string]$Command,[int]$ExitCode,[string]$Output,[datetime]$Started)
+    $script:checks += [ordered]@{
+        name=$Name
+        required=$Required
+        command=$Command
+        exit_code=$ExitCode
+        ok=($ExitCode -eq 0)
+        duration_ms=[int]((Get-Date)-$Started).TotalMilliseconds
+        output=$Output
+    }
+}
+
+function Add-InlineCheck {
+    param([string]$Name,[scriptblock]$Script,[bool]$Required=$true)
+    $started=Get-Date
+    $exit=0
+    $output=''
+    try {
+        $result = & $Script
+        $output = @($result) -join "`n"
+    } catch {
+        $exit=1
+        $output=$_.Exception.Message
+    }
+    Add-CheckResult -Name $Name -Required $Required -Command '<inline>' -ExitCode $exit -Output $output -Started $started
+}
+
+function Add-ProcessCheck {
+    param([string]$Name,[string[]]$Arguments,[bool]$Required=$true,[int]$TimeoutSeconds=$CheckTimeoutSeconds)
+    $started=Get-Date
+    $exe = 'pwsh.exe'
+    $stdout = [System.IO.Path]::GetTempFileName()
+    $stderr = [System.IO.Path]::GetTempFileName()
+    $command = "$exe " + (($Arguments | ForEach-Object { if($_ -match '[\s''"]'){ '"' + ($_ -replace '"','\"') + '"' } else { $_ } }) -join ' ')
+    $exit=124
+    $output=''
+    try {
+        $p = Start-Process -FilePath $exe -ArgumentList $Arguments -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        if (-not $p.WaitForExit([Math]::Max(1,$TimeoutSeconds) * 1000)) {
+            try { $p.Kill($true) } catch { try { $p.Kill() } catch {} }
+            $exit=124
+            $output="timeout_after_seconds=$TimeoutSeconds"
+        } else {
+            $exit=$p.ExitCode
+            $outText = if(Test-Path -LiteralPath $stdout){ Get-Content -LiteralPath $stdout -Raw -ErrorAction SilentlyContinue } else { '' }
+            $errText = if(Test-Path -LiteralPath $stderr){ Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue } else { '' }
+            $output = @($outText,$errText | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join "`n"
+        }
+    } catch {
+        $exit=1
+        $output=$_.Exception.Message
+    } finally {
+        Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    }
+    Add-CheckResult -Name $Name -Required $Required -Command $command -ExitCode $exit -Output $output -Started $started
+}
+
+function Test-JsonFile {
+    param([string]$Path)
+    if(-not (Test-Path -LiteralPath $Path)){ throw "missing: $Path" }
+    Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json | Out-Null
+    "ok: $Path"
+}
+
+$claudeVersion = (& claude --version 2>$null | Select-Object -First 1)
+$repoClaude = Join-Path $RepoPath '.claude'
+$settingsPath = Join-Path $repoClaude 'settings.json'
+$statePath = Join-Path $repoClaude 'forge-session-state.json'
+if(-not (Test-Path -LiteralPath $statePath)){ $statePath = Join-Path $repoClaude 'forge-session.lock.json' }
+$guardPath = Join-Path $repoClaude 'hooks\forge-pretool-guard.ps1'
+$auditPath = Join-Path $repoClaude 'hooks\forge-session-audit.ps1'
+
+if($Mode -eq 'Quick'){
+    Add-InlineCheck 'settings_json' { Test-JsonFile $settingsPath }
+    Add-InlineCheck 'session_state_json' { Test-JsonFile $statePath }
+    Add-InlineCheck 'pretool_guard_exists' { if(-not (Test-Path -LiteralPath $guardPath)){ throw "missing: $guardPath" }; "ok: $guardPath" }
+    Add-InlineCheck 'session_audit_exists' { if(-not (Test-Path -LiteralPath $auditPath)){ throw "missing: $auditPath" }; "ok: $auditPath" }
+    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1','-RepoPath',$RepoPath,'-Latest','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+} else {
+    Add-ProcessCheck 'docs_health' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeDocsHealth.ps1','-Json')
+    Add-InlineCheck 'session_state' { Test-JsonFile $statePath }
+    Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeLiveRouteFreshness.ps1','-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json')
+    Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeWorkspaceManifest.ps1','-RepoPath',$RepoPath,'-Json')
+    Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Rotate-ForgeAuditLogs.ps1','-Json')
+    $upArgs=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeUpstreams.ps1','-Json')
+    if($FetchUpstreams){ $upArgs += '-Fetch' }
+    Add-ProcessCheck 'upstreams' $upArgs
+    Add-ProcessCheck 'gstack_patches' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-GstackLocalPatches.ps1','-Json')
+    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1','-RepoPath',$RepoPath,'-Latest','-Json')
+    if($Mode -eq 'Full' -or $Mode -eq 'Offline'){
+        Add-ProcessCheck 'offline_smoke' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\forge-smoke.ps1','-NoLog') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,60))
+    }
+    if($Mode -eq 'Live' -or $Mode -eq 'Full'){
+        Add-ProcessCheck 'live_route' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\forge-smoke.ps1','-LiveClaudeRoute','-LiveRouteTimeoutSeconds','120') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,150))
+    }
+}
+
+$failed=@($checks | Where-Object { -not $_.ok -and $_.required })
+$result=[ordered]@{ ok=($failed.Count -eq 0); mode=$Mode; repo=$RepoPath; checked_at=(Get-Date).ToString('o'); claude_version=$claudeVersion; live_route_log_path=$LiveRouteLogPath; checks=@($checks); failed=@($failed | ForEach-Object {$_.name}) }
+if($Json){ $result | ConvertTo-Json -Depth 12 }
+else { if($result.ok){'forge_health=ok'}else{'forge_health=fail'}; foreach($c in $checks){"check=$($c.name) ok=$($c.ok) exit=$($c.exit_code) duration_ms=$($c.duration_ms)"} }
+if(-not $result.ok){ exit 1 }
+
+
+

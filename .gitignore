@@ -1,0 +1,9 @@
+.claude/
+.specs/
+*.log
+*.jsonl
+*.bak
+*.tmp
+node_modules/
+.DS_Store
+Thumbs.db
