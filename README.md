@@ -51,6 +51,12 @@ For deeper validation:
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Offline -RepoPath "<repo>"
 ```
 
+## Contributing And Releases
+
+- Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Release checklist: [docs/release-checklist.md](./docs/release-checklist.md)
+- License status: no open-source license has been selected yet. The current `LICENSE` file is an explicit pending notice, not an OSS license.
+
 ## Relationship To Markdown-First Workflows
 
 Forge is not a replacement for Markdown-first workflow kits such as flow-kit. It is the runtime enforcement layer that can sit beside them:
