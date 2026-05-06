@@ -71,7 +71,7 @@ L4 子任务路由必须追加：
 职责矩阵、CE 白名单、项目适配分层、输出上限与自然语言原则的真源在：
 
 ```text
-C:\Users\Administrator\.claude\docs\forge-workflow-boundary.md
+$env:USERPROFILE\.claude\docs\forge-workflow-boundary.md
 ```
 
 本 SKILL 只保留路由骨架，不重复定义边界规则。
@@ -98,7 +98,7 @@ profile 缺失或字段空缺时，按目录证据推断；推断不确定时默
 缺失则先做只读审计并提示可通过 `/forge 接入当前项目` 初始化；只有获得写入授权时才执行：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\init-project-profile.ps1" -RepoPath "<repo>"
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\init-project-profile.ps1" -RepoPath "<repo>"
 ```
 
 ## 路由铁律
@@ -115,7 +115,7 @@ pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.c
 10. **路由日志硬规则**：判定为 `L3/L4`、`full/guided-full/full-auto` 或 `ship` 时，输出三行路由结论后必须立即调用 `write-forge-routing.ps1` 落盘到 `<repo>/.claude/forge-routing.jsonl`。L0/L1 直通和普通 L2 build/fix 豁免，但项目接管演练/调试需显式写 `reason=drill`。漏写视为路由未完成，等同于跳过协议。详见 `forge-protocols.md` 的 “M1 实施期合规门禁” 与 routing log 字段表。
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath "<repo>" -Level <L3|L4> -Mode <full|ship|...> -Execution <guided-full|auto|full-auto> -Risk <low|medium|high> -Cost <low|medium|high> -WriteScope <module|cross_module|global> -Reason <comma-separated triggers>
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\write-forge-routing.ps1" -RepoPath "<repo>" -Level <L3|L4> -Mode <full|ship|...> -Execution <guided-full|auto|full-auto> -Risk <low|medium|high> -Cost <low|medium|high> -WriteScope <module|cross_module|global> -Reason <comma-separated triggers>
 ```
 
 ## 输出要求
@@ -175,12 +175,12 @@ M1 是 `L4` 或用户显式 `full/guided-full` 的实施期门禁；L0-L2 的日
 协议主链、BMAD 引用、路由日志格式、M1 细则、Compound/GSD 落盘、gstack 启用策略、Step 0-4 详细流程，全部在：
 
 ```text
-C:\Users\Administrator\.claude\docs\forge-protocols.md
+$env:USERPROFILE\.claude\docs\forge-protocols.md
 ```
 
 `/forge` 触发时按需读取该文档，不在本 SKILL 中重复。
 
-边界真源：`C:\Users\Administrator\.claude\docs\forge-workflow-boundary.md`
+边界真源：`$env:USERPROFILE\.claude\docs\forge-workflow-boundary.md`
 
 项目接入也使用单一入口：`/forge 接入当前项目`。不要再要求用户手记历史接入子命令；`/forge-adopt` 命令文件保留作为底层入口，但用户面建议统一通过 `/forge` 自然语言触发。
 

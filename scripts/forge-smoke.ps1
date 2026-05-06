@@ -1,6 +1,6 @@
 param(
-    [string]$EvalsPath = "C:\Users\Administrator\.claude\skills\forge\evals\evals.json",
-    [string]$LogPath = "C:\Users\Administrator\.claude\logs\forge-smoke.jsonl",
+    [string]$EvalsPath = "$env:USERPROFILE\.claude\skills\forge\evals\evals.json",
+    [string]$LogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
     [switch]$NoLog,
     [switch]$LiveClaudeRoute,
     [switch]$IncludeLiveClaudeRoute,
@@ -8,6 +8,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$RepoRootForScripts = Split-Path -Parent $ScriptDir
+$HookScriptPath = Join-Path $RepoRootForScripts "hooks\forge-pretool-guard.ps1"
+$AuditScriptPath = Join-Path $RepoRootForScripts "hooks\forge-session-audit.ps1"
 
 function Resolve-ExplicitMode {
     param([string]$Text)
@@ -87,7 +91,7 @@ function Get-ExpectedExecution {
 function Get-ActualExecutionOffline {
     param([hashtable]$Case, [string]$Mode)
     $prompt = [string]$Case.prompt
-    $json = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Resolve-ForgeExecutionMode.ps1" -Prompt $prompt -Mode $Mode -Json
+    $json = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Resolve-ForgeExecutionMode.ps1') -Prompt $prompt -Mode $Mode -Json
     try { return [string](($json | ConvertFrom-Json -AsHashtable).execution) } catch { return 'invalid' }
 }
 
@@ -313,7 +317,7 @@ if ($driftCases.Count -gt 0) {
         }
         $state | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $statePath -Encoding UTF8
 
-        $jsonText = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeGuidedFullGate.ps1" -RepoPath $tmpRoot -CandidateText ([string]$case.candidate) -Json 2>$null
+        $jsonText = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeGuidedFullGate.ps1') -RepoPath $tmpRoot -CandidateText ([string]$case.candidate) -Json 2>$null
         $exit = $LASTEXITCODE
         try { $gate = $jsonText | ConvertFrom-Json -AsHashtable } catch { $gate = @{ issues = @("invalid_gate_output") } }
         $actualIssues = @($gate.issues)
@@ -363,12 +367,12 @@ $hookState | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $hook
 $writePayload = '{"tool_name":"Write","tool_input":{"file_path":"src/app.ts"}}'
 
 # Hook 1: M1 project write without started routing must fail.
-$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-pretool-guard.ps1" -RepoPath $hookRoot 2>$null | Out-Null
+$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $HookScriptPath -RepoPath $hookRoot 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 2: M1 project write with started routing may pass.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hookRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.ok -GroupStatus started -TodoRef "todo:Hook.ok" -VerificationRef "planned:typecheck" -Reason "hook_smoke" | Out-Null
-$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-pretool-guard.ps1" -RepoPath $hookRoot 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hookRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.ok -GroupStatus started -TodoRef "todo:Hook.ok" -VerificationRef "planned:typecheck" -Reason "hook_smoke" | Out-Null
+$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $HookScriptPath -RepoPath $hookRoot 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 3: high-risk/L4 started without TodoWrite/TDD/unit-or-integration TestRef must fail.
@@ -376,8 +380,8 @@ $hrHookRoot = Join-Path $env:TEMP ("forge-smoke-hooks-hr-" + [guid]::NewGuid().T
 New-Item -ItemType Directory -Force -Path (Join-Path $hrHookRoot ".claude") | Out-Null
 git init $hrHookRoot 2>$null | Out-Null
 $hookState | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $hrHookRoot ".claude\forge-session-state.json") -Encoding UTF8
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrHookRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup Hook.hr -GroupStatus started -BatchProtocol full -HighRisk "auth" -TodoRef "skip:no-todo" -VerificationRef "planned:typecheck" -Reason "hook_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
-$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-pretool-guard.ps1" -RepoPath $hrHookRoot 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrHookRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup Hook.hr -GroupStatus started -BatchProtocol full -HighRisk "auth" -TodoRef "skip:no-todo" -VerificationRef "planned:typecheck" -Reason "hook_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $HookScriptPath -RepoPath $hrHookRoot 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 4: high-risk/L4 with planned TodoWrite/TDD/unit TestRef may pass.
@@ -385,16 +389,16 @@ $hrGoodRoot = Join-Path $env:TEMP ("forge-smoke-hooks-hr-good-" + [guid]::NewGui
 New-Item -ItemType Directory -Force -Path (Join-Path $hrGoodRoot ".claude") | Out-Null
 git init $hrGoodRoot 2>$null | Out-Null
 $hookState | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $hrGoodRoot ".claude\forge-session-state.json") -Encoding UTF8
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrGoodRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup Hook.hr.good -GroupStatus started -BatchProtocol full -HighRisk "auth" -TodoRef "TodoWrite:Hook.hr.good" -TddRef "red-green:auth" -TestRef "unit:planned" -VerificationRef "planned:unit" -Reason "hook_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
-$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-pretool-guard.ps1" -RepoPath $hrGoodRoot 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrGoodRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup Hook.hr.good -GroupStatus started -BatchProtocol full -HighRisk "auth" -TodoRef "TodoWrite:Hook.hr.good" -TddRef "red-green:auth" -TestRef "unit:planned" -VerificationRef "planned:unit" -Reason "hook_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+$writePayload | pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $HookScriptPath -RepoPath $hrGoodRoot 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 5: Stop audit fail-close blocks open M1 group.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-session-audit.ps1" -RepoPath $hookRoot -Event Stop -Mode fail-close 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $AuditScriptPath -RepoPath $hookRoot -Event Stop -Mode fail-close 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 6: Stop audit warn reports but does not block open M1 group.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-session-audit.ps1" -RepoPath $hookRoot -Event Stop -Mode warn 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $AuditScriptPath -RepoPath $hookRoot -Event Stop -Mode warn 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $hookPassed++ } else { $hookFailed++ }
 
 # Hook 7: expired state/lock is fail-close even when routing groups are completed.
@@ -429,9 +433,9 @@ $expiredLock = [ordered]@{
 $expiredState | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $expiredRoot ".claude\forge-session-state.json") -Encoding UTF8
 $expiredLock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $expiredRoot ".claude\forge-session.lock.json") -Encoding UTF8
 "expired" | Set-Content -LiteralPath (Join-Path $expiredRoot ".claude\forge\artifacts\expired.md") -Encoding UTF8
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $expiredRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.expired -GroupStatus started -TodoRef "TodoWrite:Hook.expired" -VerificationRef "planned:unit" -Reason "hook_expiry_smoke" | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $expiredRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.expired -GroupStatus completed -TodoRef "TodoWrite:Hook.expired" -TestRef "unit:passed" -VerificationRef "unit:passed" -Reason "hook_expiry_smoke" | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "F:\develop\codex\playgrounds\.claude\hooks\forge-session-audit.ps1" -RepoPath $expiredRoot -Event Stop -Mode fail-close 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $expiredRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.expired -GroupStatus started -TodoRef "TodoWrite:Hook.expired" -VerificationRef "planned:unit" -Reason "hook_expiry_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $expiredRoot -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup Hook.expired -GroupStatus completed -TodoRef "TodoWrite:Hook.expired" -TestRef "unit:passed" -VerificationRef "unit:passed" -Reason "hook_expiry_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $AuditScriptPath -RepoPath $expiredRoot -Event Stop -Mode fail-close 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hookPassed++ } else { $hookFailed++ }
 
 Write-Output "hook_gate_total=$hookTotal"
@@ -449,27 +453,27 @@ git init $m1Root 2>$null | Out-Null
 
 # Case 1: missing FORGE header/routing should fail.
 $badText = "[PIPELINE] 阶段 M1.1 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $m1Root -TaskGroup "M1.1" -CandidateText $badText -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $m1Root -TaskGroup "M1.1" -CandidateText $badText -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $m1Passed++ } else { $m1Failed++ }
 
 # Case 2: completed event exists but started event missing should fail.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingStarted -GroupStatus completed -TodoRef "todo:done" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingStarted -GroupStatus completed -TodoRef "todo:done" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "m1_smoke" | Out-Null
 $case2 = "[FORGE] phase=M1 group=M1.missingStarted mode=full reason=m1_smoke`n[PIPELINE] 阶段 M1.missingStarted 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $m1Root -TaskGroup "M1.missingStarted" -CandidateText $case2 -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $m1Root -TaskGroup "M1.missingStarted" -CandidateText $case2 -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $m1Passed++ } else { $m1Failed++ }
 
 # Case 3: missing verification/todo refs should fail.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingRefs -GroupStatus started -Reason "m1_smoke" | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingRefs -GroupStatus completed -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingRefs -GroupStatus started -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingRefs -GroupStatus completed -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "m1_smoke" | Out-Null
 $case3 = "[FORGE] phase=M1 group=M1.missingRefs mode=full reason=m1_smoke`n[PIPELINE] 阶段 M1.missingRefs 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $m1Root -TaskGroup "M1.missingRefs" -CandidateText $case3 -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $m1Root -TaskGroup "M1.missingRefs" -CandidateText $case3 -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $m1Passed++ } else { $m1Failed++ }
 
 # Case 4: non-skip learnings/artifact/verification refs must exist.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingFiles -GroupStatus started -Reason "m1_smoke" | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingFiles -GroupStatus completed -TodoRef "todo:done" -VerificationRef ".claude/forge/verification/missing.log" -ArtifactRef ".claude/forge/artifacts/missing.md" -CommitSha "skip:smoke" -LearningsRef ".claude/compound-learnings.md" -NextPhase "done" -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingFiles -GroupStatus started -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.missingFiles -GroupStatus completed -TodoRef "todo:done" -VerificationRef ".claude/forge/verification/missing.log" -ArtifactRef ".claude/forge/artifacts/missing.md" -CommitSha "skip:smoke" -LearningsRef ".claude/compound-learnings.md" -NextPhase "done" -Reason "m1_smoke" | Out-Null
 $case4 = "[FORGE] phase=M1 group=M1.missingFiles mode=full reason=m1_smoke`n[PIPELINE] 阶段 M1.missingFiles 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $m1Root -TaskGroup "M1.missingFiles" -CandidateText $case4 -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $m1Root -TaskGroup "M1.missingFiles" -CandidateText $case4 -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $m1Passed++ } else { $m1Failed++ }
 
 # Case 5: complete event chain should pass.
@@ -477,10 +481,10 @@ New-Item -ItemType Directory -Force -Path (Join-Path $m1Root ".claude\forge\veri
 Set-Content -LiteralPath (Join-Path $m1Root ".claude\forge\verification\M1.2.log") -Encoding UTF8 -Value "typecheck:pass"
 Set-Content -LiteralPath (Join-Path $m1Root ".claude\forge\artifacts\M1.2.md") -Encoding UTF8 -Value "# M1.2 artifact"
 Set-Content -LiteralPath (Join-Path $m1Root ".claude\compound-learnings.md") -Encoding UTF8 -Value "- smoke learning"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.2 -GroupStatus started -TodoRef "todo:M1.2" -VerificationRef "planned:typecheck" -ArtifactRef "artifact:planned" -Reason "m1_smoke" | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.2 -GroupStatus completed -TodoRef "todo:M1.2:done" -VerificationRef ".claude/forge/verification/M1.2.log" -ArtifactRef ".claude/forge/artifacts/M1.2.md" -CommitSha "skip:smoke-no-commit" -LearningsRef ".claude/compound-learnings.md" -NextPhase "done" -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.2 -GroupStatus started -TodoRef "todo:M1.2" -VerificationRef "planned:typecheck" -ArtifactRef "artifact:planned" -Reason "m1_smoke" | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $m1Root -Level L3 -Mode full -Execution guided-full -AdoptionMode local_routing -PipelinePhase M1 -TaskGroup M1.2 -GroupStatus completed -TodoRef "todo:M1.2:done" -VerificationRef ".claude/forge/verification/M1.2.log" -ArtifactRef ".claude/forge/artifacts/M1.2.md" -CommitSha "skip:smoke-no-commit" -LearningsRef ".claude/compound-learnings.md" -NextPhase "done" -Reason "m1_smoke" | Out-Null
 $goodText = "[FORGE] phase=M1 group=M1.2 mode=full reason=m1_smoke`n[FORGE] write_scope=module verify=typecheck commit_required=false`n[PIPELINE] 阶段 M1.2 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $m1Root -TaskGroup "M1.2" -CandidateText $goodText -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $m1Root -TaskGroup "M1.2" -CandidateText $goodText -Json 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $m1Passed++ } else { $m1Failed++ }
 
 Write-Output "m1_gate_total=$m1Total"
@@ -496,27 +500,27 @@ New-Item -ItemType Directory -Force -Path (Join-Path $hrRoot ".claude") | Out-Nu
 git init $hrRoot 2>$null | Out-Null
 
 # Case HR1: high risk with typecheck only and no TodoWrite/TDD/TestRef should fail.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR1 -GroupStatus started -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR1 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "skip:no-todo" -VerificationRef "typecheck:pass" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR1 -GroupStatus started -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR1 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "skip:no-todo" -VerificationRef "typecheck:pass" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
 $hrBad = "[FORGE] phase=M1 group=HR1 mode=full reason=hr_smoke`n[PIPELINE] 阶段 HR1 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $hrRoot -TaskGroup "HR1" -CandidateText $hrBad -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $hrRoot -TaskGroup "HR1" -CandidateText $hrBad -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hrPassed++ } else { $hrFailed++ }
 
 # Case HR2: high risk with TodoWrite/TDD/TestRef should pass.
 New-Item -ItemType Directory -Force -Path (Join-Path $hrRoot ".claude\forge\verification") | Out-Null
 Set-Content -LiteralPath (Join-Path $hrRoot ".claude\forge\verification\HR2.log") -Encoding UTF8 -Value "typecheck:pass;unit:pass"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR2 -GroupStatus started -TodoRef "TodoWrite:HR2" -VerificationRef "planned:unit" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR2 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "TodoWrite:HR2" -TddRef "red-green:jwt" -TestRef "unit:pass:5" -VerificationRef ".claude/forge/verification/HR2.log" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR2 -GroupStatus started -TodoRef "TodoWrite:HR2" -VerificationRef "planned:unit" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR2 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "TodoWrite:HR2" -TddRef "red-green:jwt" -TestRef "unit:pass:5" -VerificationRef ".claude/forge/verification/HR2.log" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
 $hrGood = "[FORGE] phase=M1 group=HR2 mode=full reason=hr_smoke`n[PIPELINE] 阶段 HR2 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $hrRoot -TaskGroup "HR2" -CandidateText $hrGood -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $hrRoot -TaskGroup "HR2" -CandidateText $hrGood -Json 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $hrPassed++ } else { $hrFailed++ }
 
 
 # Case HR3: high risk with non-unit/non-integration TestRef should fail.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR3 -GroupStatus started -TodoRef "TodoWrite:HR3" -VerificationRef "planned:manual" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR3 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "TodoWrite:HR3" -TddRef "red-green:jwt" -TestRef "manual:checked" -VerificationRef "typecheck:pass;manual:checked" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR3 -GroupStatus started -TodoRef "TodoWrite:HR3" -VerificationRef "planned:manual" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $hrRoot -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -BatchProtocol full -TaskGroup HR3 -GroupStatus completed -HighRisk "auth,jwt" -TodoRef "TodoWrite:HR3" -TddRef "red-green:jwt" -TestRef "manual:checked" -VerificationRef "typecheck:pass;manual:checked" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "hr_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
 $hrManualOnly = "[FORGE] phase=M1 group=HR3 mode=full reason=hr_smoke`n[PIPELINE] 阶段 HR3 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $hrRoot -TaskGroup "HR3" -CandidateText $hrManualOnly -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $hrRoot -TaskGroup "HR3" -CandidateText $hrManualOnly -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $hrPassed++ } else { $hrFailed++ }
 
 # L4 downgrade contract smoke: project-level L4 with batch-level L2/build must carry downgrade reason and parent plan ref.
@@ -528,7 +532,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $l4Root ".claude") | Out-Nu
 git init $l4Root 2>$null | Out-Null
 
 # Case 1: write should reject missing BatchProtocol for L4 M1.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.missingBatch -GroupStatus completed -TodoRef "skip:smoke" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.missingBatch -GroupStatus completed -TodoRef "skip:smoke" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $l4DowngradePassed++ } else { $l4DowngradeFailed++ }
 
 # Case 2: legacy log without batch_protocol should fail M1 compliance.
@@ -538,14 +542,14 @@ $legacyRouting = Join-Path $legacyRoot ".claude\forge-routing.jsonl"
 [ordered]@{ time=(Get-Date).ToString("o"); repo=$legacyRoot; level="L4"; mode="full"; pipeline_phase="M1"; task_group="L4.legacy"; group_status="started" } | ConvertTo-Json -Compress | Add-Content -LiteralPath $legacyRouting -Encoding utf8
 [ordered]@{ time=(Get-Date).ToString("o"); repo=$legacyRoot; level="L4"; mode="full"; pipeline_phase="M1"; task_group="L4.legacy"; group_status="completed"; todo_ref="skip:smoke"; verification_ref="skip:smoke"; artifact_ref="skip:smoke"; commit_sha="skip:smoke"; learnings_ref="skip:smoke"; next_phase="done" } | ConvertTo-Json -Compress | Add-Content -LiteralPath $legacyRouting -Encoding utf8
 $l4LegacyText = "[FORGE] phase=M1 group=L4.legacy mode=full reason=smoke`n[PIPELINE] 阶段 L4.legacy 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $legacyRoot -TaskGroup "L4.legacy" -CandidateText $l4LegacyText -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $legacyRoot -TaskGroup "L4.legacy" -CandidateText $l4LegacyText -Json 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { $l4DowngradePassed++ } else { $l4DowngradeFailed++ }
 
 # Case 3: explicit build downgrade with reason and parent plan ref should pass.
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.good -GroupStatus started -BatchProtocol build -DowngradeReason within_confirmed_plan -ParentPlanRef ".claude/forge/artifacts/parent.md" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\write-forge-routing.ps1" -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.good -GroupStatus completed -BatchProtocol build -DowngradeReason within_confirmed_plan -ParentPlanRef ".claude/forge/artifacts/parent.md" -TodoRef "skip:smoke" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.good -GroupStatus started -BatchProtocol build -DowngradeReason within_confirmed_plan -ParentPlanRef ".claude/forge/artifacts/parent.md" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'write-forge-routing.ps1') -RepoPath $l4Root -Level L4 -Mode full -Execution guided-full -AdoptionMode full -PipelinePhase M1 -TaskGroup L4.good -GroupStatus completed -BatchProtocol build -DowngradeReason within_confirmed_plan -ParentPlanRef ".claude/forge/artifacts/parent.md" -TodoRef "skip:smoke" -VerificationRef "skip:smoke" -ArtifactRef "skip:smoke" -CommitSha "skip:smoke" -LearningsRef "skip:smoke" -NextPhase "done" -Reason "l4_downgrade_smoke" -InheritedFrom ".claude/forge/artifacts/parent.md" -ExecutionScope light -ParentLevel L4 | Out-Null
 $l4GoodText = "[FORGE] phase=M1 group=L4.good mode=full reason=smoke`n[PIPELINE] 阶段 L4.good 完成 → 进入 done"
-& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1" -RepoPath $l4Root -TaskGroup "L4.good" -CandidateText $l4GoodText -Json 2>$null | Out-Null
+& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1') -RepoPath $l4Root -TaskGroup "L4.good" -CandidateText $l4GoodText -Json 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { $l4DowngradePassed++ } else { $l4DowngradeFailed++ }
 
 Write-Output "l4_downgrade_gate_total=$l4DowngradeTotal"
@@ -554,7 +558,7 @@ Write-Output "l4_downgrade_gate_failed=$l4DowngradeFailed"
 if ($l4DowngradeFailed -gt 0) { exit 1 }
 
 # External adapter contract smoke: upstream frameworks must stay isolated behind Forge adapters.
-$adapterJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeAdapterCompatibility.ps1" -RepoPath (Get-Location).Path -Json
+$adapterJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeAdapterCompatibility.ps1') -RepoPath (Get-Location).Path -Json
 $adapterExit = $LASTEXITCODE
 try { $adapter = $adapterJson | ConvertFrom-Json -AsHashtable } catch { $adapter = @{ ok = $false; issues = @("invalid_adapter_output") } }
 $adapterPassed = if ($adapterExit -eq 0 -and [bool]$adapter.ok) { 1 } else { 0 }
@@ -568,7 +572,7 @@ if ($adapterFailed -gt 0) {
 }
 
 # Forge docs health smoke: command/skill/docs boundaries must not drift.
-$docsHealthJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Test-ForgeDocsHealth.ps1" -Json
+$docsHealthJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1') -Json
 $docsHealthExit = $LASTEXITCODE
 try { $docsHealth = $docsHealthJson | ConvertFrom-Json -AsHashtable } catch { $docsHealth = @{ ok = $false; issues = @("invalid_docs_health_output") } }
 $docsHealthPassed = if ($docsHealthExit -eq 0 -and [bool]$docsHealth.ok) { 1 } else { 0 }

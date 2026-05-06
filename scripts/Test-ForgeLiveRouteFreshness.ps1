@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$LogPath = "C:\Users\Administrator\.claude\logs\forge-smoke.jsonl",
+    [string]$LogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
     [int]$MaxAgeHours = 24,
     [string]$RequiredClaudeVersion = "",
     [switch]$Json

@@ -1,15 +1,17 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Quick','Offline','Live','Full')][string]$Mode = 'Offline',
-    [string]$RepoPath = "F:\develop\codex\playgrounds",
+    [string]$RepoPath = ".",
     [int]$LiveMaxAgeHours = 24,
-    [string]$LiveRouteLogPath = "C:\Users\Administrator\.claude\logs\forge-smoke.jsonl",
+    [string]$LiveRouteLogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
     [string]$RequiredClaudeVersion = "2.1.128",
     [switch]$FetchUpstreams,
     [int]$CheckTimeoutSeconds = 30,
     [switch]$Json
 )
 $ErrorActionPreference = "Continue"
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$ClaudeRoot = Split-Path -Parent $ScriptDir
 $checks=@()
 
 function Add-CheckResult {
@@ -90,23 +92,23 @@ if($Mode -eq 'Quick'){
     Add-InlineCheck 'session_state_json' { Test-JsonFile $statePath }
     Add-InlineCheck 'pretool_guard_exists' { if(-not (Test-Path -LiteralPath $guardPath)){ throw "missing: $guardPath" }; "ok: $guardPath" }
     Add-InlineCheck 'session_audit_exists' { if(-not (Test-Path -LiteralPath $auditPath)){ throw "missing: $auditPath" }; "ok: $auditPath" }
-    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1','-RepoPath',$RepoPath,'-Latest','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),'-RepoPath',$RepoPath,'-Latest','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
 } else {
-    Add-ProcessCheck 'docs_health' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeDocsHealth.ps1','-Json')
+    Add-ProcessCheck 'docs_health' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1'),'-ClaudeRoot',$ClaudeRoot,'-Json')
     Add-InlineCheck 'session_state' { Test-JsonFile $statePath }
-    Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeLiveRouteFreshness.ps1','-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json')
-    Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeWorkspaceManifest.ps1','-RepoPath',$RepoPath,'-Json')
-    Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Rotate-ForgeAuditLogs.ps1','-Json')
-    $upArgs=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeUpstreams.ps1','-Json')
+    Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),'-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json')
+    Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),'-RepoPath',$RepoPath,'-Json')
+    Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),'-Json')
+    $upArgs=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeUpstreams.ps1'),'-Json')
     if($FetchUpstreams){ $upArgs += '-Fetch' }
     Add-ProcessCheck 'upstreams' $upArgs
-    Add-ProcessCheck 'gstack_patches' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-GstackLocalPatches.ps1','-Json')
-    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1','-RepoPath',$RepoPath,'-Latest','-Json')
+    Add-ProcessCheck 'gstack_patches' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-GstackLocalPatches.ps1'),'-Json')
+    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),'-RepoPath',$RepoPath,'-Latest','-Json')
     if($Mode -eq 'Full' -or $Mode -eq 'Offline'){
-        Add-ProcessCheck 'offline_smoke' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\forge-smoke.ps1','-NoLog') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,60))
+        Add-ProcessCheck 'offline_smoke' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'forge-smoke.ps1'),'-NoLog') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,60))
     }
     if($Mode -eq 'Live' -or $Mode -eq 'Full'){
-        Add-ProcessCheck 'live_route' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File','C:\Users\Administrator\.claude\scripts\forge-smoke.ps1','-LiveClaudeRoute','-LiveRouteTimeoutSeconds','120') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,150))
+        Add-ProcessCheck 'live_route' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'forge-smoke.ps1'),'-LiveClaudeRoute','-LiveRouteTimeoutSeconds','120') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,150))
     }
 }
 

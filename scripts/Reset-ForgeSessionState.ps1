@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess=$true)]
 param(
-    [string]$RepoPath = "F:\develop\codex\playgrounds",
+    [string]$RepoPath = ".",
     [int]$TtlHours = 24,
     [switch]$Force,
     [switch]$Json,
@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ScriptDir = Split-Path -Parent $PSCommandPath
 
 function Resolve-RepoRoot {
     param([string]$Path)
@@ -121,7 +122,7 @@ $result = [ordered]@{
     lock_was_expired = $lockExpired
     expires_at = if ($needsReset) { $newExpiry } elseif ($state -and (Test-MapKey $state 'expires_at')) { [string]$state.expires_at } else { '' }
     validation_commands = @(
-        ('pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ''C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1'' -RepoPath ''{0}'' -Latest -Json' -f $repoRoot),
+        ('pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ''{0}'' -RepoPath ''{1}'' -Latest -Json' -f (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'), $repoRoot),
         ('pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ''{0}\.claude\hooks\forge-session-audit.ps1'' -RepoPath ''{0}'' -Event Stop -Mode fail-close' -f $repoRoot)
     )
 }

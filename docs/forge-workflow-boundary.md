@@ -144,7 +144,7 @@ Forge 默认不要求用户记斜杠命令。
 | 这是长期复杂项目，完整接入 | `/forge 完整接入当前项目` |
 | 临时项目，别搞重 | `/forge 接入当前项目 audit` 或 `/forge 接入当前项目 init` |
 
-底层脚本映射和执行前后验证见 `C:\Users\Administrator\.claude\docs\forge-protocols.md` 的 “自然语言入口执行”。
+底层脚本映射和执行前后验证见 `$env:USERPROFILE\.claude\docs\forge-protocols.md` 的 “自然语言入口执行”。
 
 
 

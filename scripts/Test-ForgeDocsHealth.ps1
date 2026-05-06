@@ -1,5 +1,5 @@
 param(
-    [string]$ClaudeRoot = "C:\Users\Administrator\.claude",
+    [string]$ClaudeRoot = "$env:USERPROFILE\.claude",
     [switch]$Json
 )
 

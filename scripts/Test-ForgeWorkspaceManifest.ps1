@@ -1,12 +1,14 @@
 [CmdletBinding()]
 param(
-    [string]$RepoPath = "F:\develop\codex\playgrounds",
+    [string]$RepoPath = ".",
     [string]$ManifestPath = "",
     [switch]$Update,
     [switch]$Json
 )
 
 $ErrorActionPreference = "Stop"
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$ClaudeRoot = Split-Path -Parent $ScriptDir
 function Resolve-RepoRoot {
     param([string]$Path)
     try {
@@ -34,17 +36,17 @@ $relativePaths = @(
     '.claude\forge-session-state.json',
     '.claude\forge-session.lock.json',
     '.claude\forge-routing.jsonl',
-    'C:\Users\Administrator\.claude\scripts\forge-smoke.ps1',
-    'C:\Users\Administrator\.claude\scripts\Test-ForgeDocsHealth.ps1',
-    'C:\Users\Administrator\.claude\scripts\Test-ForgeM1Compliance.ps1',
-    'C:\Users\Administrator\.claude\scripts\Test-ForgeLiveRouteFreshness.ps1',
-    'C:\Users\Administrator\.claude\scripts\Reset-ForgeSessionState.ps1',
-    'C:\Users\Administrator\.claude\scripts\Rotate-ForgeAuditLogs.ps1',
-    'C:\Users\Administrator\.claude\scripts\Test-ForgeWorkspaceManifest.ps1',
-    'C:\Users\Administrator\.claude\skills\forge\evals\evals.json',
-    'C:\Users\Administrator\.claude\docs\forge-protocols.md',
-    'C:\Users\Administrator\.claude\docs\forge-schema-versions.md',
-    'C:\Users\Administrator\.claude\docs\hook-architecture.md'
+    (Join-Path $ScriptDir 'forge-smoke.ps1'),
+    (Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1'),
+    (Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),
+    (Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),
+    (Join-Path $ScriptDir 'Reset-ForgeSessionState.ps1'),
+    (Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),
+    (Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),
+    (Join-Path $ClaudeRoot 'skills\forge\evals\evals.json'),
+    (Join-Path $ClaudeRoot 'docs\forge-protocols.md'),
+    (Join-Path $ClaudeRoot 'docs\forge-schema-versions.md'),
+    (Join-Path $ClaudeRoot 'docs\hook-architecture.md')
 )
 
 $current = @()

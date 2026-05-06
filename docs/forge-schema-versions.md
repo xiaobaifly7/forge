@@ -45,7 +45,7 @@
 
 当 `<repo>/.claude/forge-drift-audit.jsonl` 因沙箱、权限或文件锁无法追加时，`forge-session-audit.ps1` 会保留原始 audit record 并写入 fallback：
 
-1. 优先：`C:\Users\Administrator\.claude\logs\forge-drift-audit-fallback.jsonl`
+1. 优先：`$env:USERPROFILE\.claude\logs\forge-drift-audit-fallback.jsonl`
 2. 兜底：`%TEMP%\forge-drift-audit-fallback.jsonl`
 
 fallback 记录包含：`original_path`、`write_errors[]`、`record`。其中 `record` 保留原本要写入 drift audit 的 `mode`、`effective_severity`、`issues` 与 `issue_records[]`。

@@ -17,5 +17,5 @@ pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\
 接入后运行：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Administrator\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Quick -RepoPath "<repo>"
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Quick -RepoPath "<repo>"
 ```
