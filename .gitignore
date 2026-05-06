@@ -1,4 +1,7 @@
 .claude/
+!examples/minimal-project/.claude/
+!examples/minimal-project/.claude/settings.json
+!examples/minimal-project/.claude/forge-session-state.blocked.json
 .specs/
 *.log
 *.jsonl

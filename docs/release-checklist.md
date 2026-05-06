@@ -14,7 +14,7 @@
 - `README.md` 说明 Forge 的定位：Claude Code workflow control plane / runtime enforcement adapter。
 - `docs/adapter-contract.md` 说明外部工具如何被可选调用。
 - `docs/forge-workflow-boundary.md` 说明 Forge 不替代 Markdown-first workflow kits。
-- `LICENSE` 已确认：发布为真正开源前，应替换为 MIT、Apache-2.0、BSD-3-Clause、GPL 等正式协议之一。
+- `LICENSE` 已确认，当前为 MIT License。
 
 ## 3. 验证命令
 

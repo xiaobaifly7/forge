@@ -55,7 +55,8 @@ pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\
 
 - Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 - Release checklist: [docs/release-checklist.md](./docs/release-checklist.md)
-- License status: no open-source license has been selected yet. The current `LICENSE` file is an explicit pending notice, not an OSS license.
+- License: [MIT](./LICENSE)
+- Minimal example: [examples/minimal-project](./examples/minimal-project)
 
 ## Relationship To Markdown-First Workflows
 

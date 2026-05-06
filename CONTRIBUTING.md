@@ -50,4 +50,4 @@ Remove-Item -LiteralPath .\.claude -Recurse -Force
 
 ## License
 
-当前仓库还没有选定开源协议。除非 `LICENSE` 被替换为正式开源协议，否则外部贡献在合并前需要维护者明确确认授权方式。
+本仓库使用 MIT License。提交贡献即表示你同意按仓库当前 license 授权你的贡献。

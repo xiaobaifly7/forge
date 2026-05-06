@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "mode": "full",
+  "execution": "guided-full",
+  "phase": "1A",
+  "question_pending": true,
+  "user_confirmed_next_phase": false,
+  "artifact_path": "",
+  "session_id": "00000000-0000-0000-0000-000000000000",
+  "owner": "claude-code",
+  "created_at": "2099-01-01T00:00:00.0000000+00:00",
+  "updated_at": "2099-01-01T00:00:00.0000000+00:00",
+  "expires_at": "2099-01-02T00:00:00.0000000+00:00",
+  "last_pipeline_marker": "[PIPELINE] 阶段 1A 开始 -> brainstorming/research"
+}
