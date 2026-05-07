@@ -1,0 +1,11 @@
+{
+  "name": "example-task",
+  "status": "planning",
+  "stage": "task",
+  "priority": "normal",
+  "owner": "developer",
+  "branch": null,
+  "pr": null,
+  "parent": null,
+  "children": []
+}

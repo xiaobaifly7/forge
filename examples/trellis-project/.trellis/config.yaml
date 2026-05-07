@@ -1,0 +1,4 @@
+project: forge-trellis-example
+hooks:
+  mode: audit-only
+packages: []

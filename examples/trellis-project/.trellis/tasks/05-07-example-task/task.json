@@ -1,0 +1,6 @@
+{
+  "name": "example-task",
+  "status": "planning",
+  "priority": "normal",
+  "assignee": "developer"
+}
