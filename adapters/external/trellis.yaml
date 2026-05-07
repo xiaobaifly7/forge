@@ -1,0 +1,30 @@
+name: trellis
+upstream: https://github.com/mindfold-ai/Trellis
+mode: optional-adapter
+absorbed_as: task-kernel
+license: AGPL-3.0
+pinned_ref: manual-audit-required
+last_audited_ref: manual-audit-required
+last_audited: null
+status: audit-only
+owned_by: Forge
+update_policy:
+  default_action: audit
+  auto_apply: false
+  apply_requires_user_approval: true
+impact_rules:
+  no_impact:
+    - README or docs copy changes
+    - CLI internals that do not change task/spec/workspace schema
+    - new platform adapters for unrelated tools
+  mapping_update_required:
+    - task.json schema changed
+    - prd.md or info.md convention changed
+    - implement.jsonl or check.jsonl semantics changed
+    - runtime session pointer changed
+    - spec/tasks/workspace directory model changed
+  breaking_change:
+    - hook system must replace Forge hooks
+    - generated platform configs become required
+    - license or commercial-use terms changed
+    - telemetry or network behavior added

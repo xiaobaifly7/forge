@@ -1,0 +1,14 @@
+{
+  "name": "forge",
+  "profile_version": 1,
+  "role": "forge-core-repository",
+  "governance": "authoritative",
+  "external_adapters": {
+    "flow-kit": "read_only_methodology_adapter",
+    "trellis": "read_only_task_spec_workspace_adapter"
+  },
+  "notes": [
+    "This repo-local profile satisfies Forge adapter compatibility checks.",
+    "It does not install external runtimes or take over global hooks."
+  ]
+}

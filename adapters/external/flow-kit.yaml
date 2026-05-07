@@ -1,0 +1,26 @@
+name: flow-kit
+upstream: https://github.com/rihebty/flow-kit
+mode: optional-adapter
+absorbed_as: methodology
+pinned_ref: manual-audit-required
+last_audited_ref: manual-audit-required
+last_audited: null
+status: audit-only
+owned_by: Forge
+update_policy:
+  default_action: audit
+  auto_apply: false
+  apply_requires_user_approval: true
+impact_rules:
+  no_impact:
+    - README or example copy changes
+    - documentation that does not change stage semantics
+  mapping_update_required:
+    - stage names changed
+    - stage order changed
+    - GO.md routing semantics changed
+    - prompts or templates structure changed
+  breaking_change:
+    - runtime dependency introduced
+    - hooks or global configuration required
+    - telemetry or network behavior added

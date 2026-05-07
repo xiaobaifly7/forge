@@ -258,6 +258,62 @@ if (-not $NoLog) {
 if ($LiveClaudeRoute) { Invoke-LiveClaudeRouteSmoke -Raw $raw -LogPath $LogPath -NoLog ([bool]$NoLog) -TimeoutSeconds $LiveRouteTimeoutSeconds; exit 0 }
 if ($IncludeLiveClaudeRoute) { Invoke-LiveClaudeRouteSmoke -Raw $raw -LogPath $LogPath -NoLog ([bool]$NoLog) -TimeoutSeconds $LiveRouteTimeoutSeconds }
 
+$adapterSmokePath = Join-Path $RepoRootForScripts "examples\flow-kit-project"
+$trellisSmokePath = Join-Path $RepoRootForScripts "examples\trellis-project"
+$taskKernelSmokePath = Join-Path $RepoRootForScripts "examples\task-kernel-project"
+$taskKernelWritableSmokePath = Join-Path $env:TEMP ("forge-task-kernel-smoke-" + [guid]::NewGuid().ToString("N"))
+Copy-Item -Recurse -LiteralPath $taskKernelSmokePath -Destination $taskKernelWritableSmokePath
+$adapterKernelSmokeTotal = 11
+$adapterKernelSmokePassed = 0
+try {
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeExternalAdapter.ps1") -Name flow-kit -RepoPath $adapterSmokePath | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "flow-kit adapter smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeExternalAdapter.ps1") -Name trellis -RepoPath $trellisSmokePath | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "trellis adapter smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeTaskKernel.ps1") -RepoPath $taskKernelSmokePath | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "task kernel smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Resolve-ForgeStage.ps1") -RepoPath $taskKernelSmokePath -SessionId example | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "stage engine smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Update-ForgeTaskContext.ps1") -RepoPath $taskKernelSmokePath -TaskPath ".forge\tasks\05-07-example-task" -Target list | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "task context smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Add-ForgeSpecFinding.ps1") -RepoPath $taskKernelWritableSmokePath -Category guides -Title "Smoke Finding" -Summary "Smoke finding validates spec promotion." -Source "smoke" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "spec finding smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Compare-ForgeExternalAdapterRef.ps1") -Name flow-kit -TargetRef "README" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "external ref compare smoke failed" }
+    $adapterKernelSmokePassed++
+    $createdTaskJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "New-ForgeTask.ps1") -RepoPath $taskKernelWritableSmokePath -Name "Smoke Task" -Title "Smoke Task" -Goal "Validate task command chaining." -Json
+    if ($LASTEXITCODE -ne 0) { throw "new task smoke failed" }
+    $createdTask = $createdTaskJson | ConvertFrom-Json
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Set-ForgeActiveTask.ps1") -RepoPath $taskKernelWritableSmokePath -SessionId smoke -TaskPath $createdTask.task_path -Stage task | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "new task path chaining smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Update-ForgeTaskContext.ps1") -RepoPath $taskKernelWritableSmokePath -TaskPath $createdTask.task_path -Target implement -File ".forge\..\README.md" -Reason "must reject traversal" *> $null
+    if ($LASTEXITCODE -eq 0) { throw "task context traversal smoke failed" }
+    $adapterKernelSmokePassed++
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Add-ForgeSpecFinding.ps1") -RepoPath $taskKernelWritableSmokePath -Category guides -Title "Smoke Finding" -Summary "Smoke finding validates spec promotion." -Source "smoke" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "spec finding idempotency smoke failed" }
+    $smokeFindingPath = Join-Path $taskKernelWritableSmokePath ".forge\spec\guides\$(Get-Date -Format 'yyyy-MM-dd')-smoke-finding.md"
+    $smokeFindingContent = Get-Content -LiteralPath $smokeFindingPath -Raw -Encoding UTF8
+    if (@([regex]::Matches($smokeFindingContent, '(?m)^# Smoke Finding$')).Count -ne 1) { throw "spec finding duplicate smoke failed" }
+    $adapterKernelSmokePassed++
+    $smokeHistoryDir = Join-Path $taskKernelWritableSmokePath ".forge\spec\guides\.history"
+    if (-not (Test-Path -LiteralPath $smokeHistoryDir)) { throw "spec finding history smoke failed" }
+    $smokeHistoryContent = Get-ChildItem -LiteralPath $smokeHistoryDir -Filter "*-smoke-finding-*.md" | Select-Object -First 1 | Get-Content -Raw -Encoding UTF8
+    if ($smokeHistoryContent -notmatch "Smoke finding validates spec promotion.") { throw "spec finding history content smoke failed" }
+    $adapterKernelSmokePassed++
+} finally {
+    Remove-Item -Recurse -Force -LiteralPath $taskKernelWritableSmokePath -ErrorAction SilentlyContinue
+}
+Write-Output "adapter_kernel_smoke_total=$adapterKernelSmokeTotal"
+Write-Output "adapter_kernel_smoke_passed=$adapterKernelSmokePassed"
+Write-Output "adapter_kernel_smoke_failed=$($adapterKernelSmokeTotal - $adapterKernelSmokePassed)"
+
 Write-Output "forge_smoke_total=$($cases.Count)"
 Write-Output "forge_smoke_passed=$passed"
 Write-Output "forge_smoke_failed=$failed"

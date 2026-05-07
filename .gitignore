@@ -1,4 +1,17 @@
 .claude/
+!.claude/
+.claude/*
+!.claude/project-profile.json
+!.claude/workflow-policy.md
+!.claude/settings.json
+!.claude/forge-session-state.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/forge-pretool-guard.ps1
+!.claude/hooks/forge-session-audit.ps1
+!.claude/forge/
+.claude/forge/*
+!.claude/forge/adapter-contract.md
 !examples/minimal-project/.claude/
 !examples/minimal-project/.claude/settings.json
 !examples/minimal-project/.claude/forge-session-state.blocked.json
