@@ -65,7 +65,7 @@ Remove-Item -LiteralPath .\.claude -Recurse -Force
 smoke：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -NoLog
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog
 ```
 
 Git 检查：

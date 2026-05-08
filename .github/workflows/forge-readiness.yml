@@ -38,7 +38,7 @@ jobs:
       - name: Smoke
         shell: pwsh
         run: |
-          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -NoLog
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog
 
       - name: Release readiness
         shell: pwsh
