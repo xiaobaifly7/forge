@@ -284,7 +284,7 @@ try {
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Add-ForgeSpecFinding.ps1") -RepoPath $taskKernelWritableSmokePath -Category guides -Title "Smoke Finding" -Summary "Smoke finding validates spec promotion." -Source "smoke" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "spec finding smoke failed" }
     $adapterKernelSmokePassed++
-    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Compare-ForgeExternalAdapterRef.ps1") -Name flow-kit -TargetRef "README" | Out-Null
+    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Compare-ForgeExternalAdapterRef.ps1") -Name flow-kit -TargetRef "HEAD" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "external ref compare smoke failed" }
     $adapterKernelSmokePassed++
     $createdTaskJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "New-ForgeTask.ps1") -RepoPath $taskKernelWritableSmokePath -Name "Smoke Task" -Title "Smoke Task" -Goal "Validate task command chaining." -Json
@@ -638,6 +638,21 @@ Write-Output "docs_health_passed=$docsHealthPassed"
 Write-Output "docs_health_failed=$docsHealthFailed"
 if ($docsHealthFailed -gt 0) {
     $docsHealth | ConvertTo-Json -Depth 8
+    exit 1
+}
+
+# Release readiness smoke: aggregate gates must stay machine-readable without
+# recursively invoking the full smoke suite.
+$readinessJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeReleaseReadiness.ps1') -RepoPath (Get-Location).Path -SkipSmoke -Json
+$readinessExit = $LASTEXITCODE
+try { $readiness = $readinessJson | ConvertFrom-Json -AsHashtable } catch { $readiness = @{ ok = $false; failed = @("invalid_readiness_output") } }
+$readinessPassed = if ($readinessExit -eq 0 -and [bool]$readiness.ok) { 1 } else { 0 }
+$readinessFailed = if ($readinessPassed -eq 1) { 0 } else { 1 }
+Write-Output "release_readiness_total=1"
+Write-Output "release_readiness_passed=$readinessPassed"
+Write-Output "release_readiness_failed=$readinessFailed"
+if ($readinessFailed -gt 0) {
+    $readiness | ConvertTo-Json -Depth 8
     exit 1
 }
 

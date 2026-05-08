@@ -2,9 +2,9 @@ name: flow-kit
 upstream: https://github.com/rihebty/flow-kit
 mode: optional-adapter
 absorbed_as: methodology
-pinned_ref: manual-audit-required
-last_audited_ref: manual-audit-required
-last_audited: null
+pinned_ref: 122261bca37930da712f6aaacf6f36e86ed99668
+last_audited_ref: 122261bca37930da712f6aaacf6f36e86ed99668
+last_audited: 2026-05-08T17:58:00+08:00
 status: audit-only
 owned_by: Forge
 update_policy:

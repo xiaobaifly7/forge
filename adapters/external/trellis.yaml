@@ -3,9 +3,9 @@ upstream: https://github.com/mindfold-ai/Trellis
 mode: optional-adapter
 absorbed_as: task-kernel
 license: AGPL-3.0
-pinned_ref: manual-audit-required
-last_audited_ref: manual-audit-required
-last_audited: null
+pinned_ref: 3edc97212c5fe32087f98f72cae60f8a0e424bb1
+last_audited_ref: 3edc97212c5fe32087f98f72cae60f8a0e424bb1
+last_audited: 2026-05-08T17:58:00+08:00
 status: audit-only
 owned_by: Forge
 update_policy:

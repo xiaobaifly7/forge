@@ -40,12 +40,15 @@ function Get-OutputSummary {
 function Add-CheckResult {
     param([string]$Name,[bool]$Required,[string]$Command,[int]$ExitCode,[string]$Output,[datetime]$Started)
     $summary = Get-OutputSummary -Output $Output
+    $ok = ($ExitCode -eq 0)
+    $severity = if ($ok) { "pass" } elseif ($Required) { "error" } else { "warning" }
     $script:checks += [ordered]@{
         name=$Name
         required=$Required
+        severity=$severity
         command=$Command
         exit_code=$ExitCode
-        ok=($ExitCode -eq 0)
+        ok=$ok
         duration_ms=[int]((Get-Date)-$Started).TotalMilliseconds
         summary=$summary
         output=$Output
@@ -146,9 +149,10 @@ if($Mode -eq 'Quick'){
 }
 
 $failed=@($checks | Where-Object { -not $_.ok -and $_.required })
-$result=[ordered]@{ ok=($failed.Count -eq 0); mode=$Mode; repo=$RepoPath; checked_at=(Get-Date).ToString('o'); claude_version=$claudeVersion; live_route_log_path=$LiveRouteLogPath; checks=@($checks); failed=@($failed | ForEach-Object {$_.name}) }
+$warnings=@($checks | Where-Object { -not $_.ok -and -not $_.required })
+$result=[ordered]@{ ok=($failed.Count -eq 0); mode=$Mode; repo=$RepoPath; checked_at=(Get-Date).ToString('o'); claude_version=$claudeVersion; live_route_log_path=$LiveRouteLogPath; checks=@($checks); failed=@($failed | ForEach-Object {$_.name}); warnings=@($warnings | ForEach-Object {$_.name}) }
 if($Json){ $result | ConvertTo-Json -Depth 12 }
-else { if($result.ok){'forge_health=ok'}else{'forge_health=fail'}; foreach($c in $checks){"check=$($c.name) ok=$($c.ok) exit=$($c.exit_code) duration_ms=$($c.duration_ms)"} }
+else { if($result.ok){'forge_health=ok'}else{'forge_health=fail'}; foreach($c in $checks){"check=$($c.name) severity=$($c.severity) ok=$($c.ok) exit=$($c.exit_code) duration_ms=$($c.duration_ms)"} }
 if(-not $result.ok){ exit 1 }
 
 

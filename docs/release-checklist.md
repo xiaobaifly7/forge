@@ -18,6 +18,18 @@
 
 ## 3. 验证命令
 
+一键 ready 检查：
+
+```powershell
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -Json
+```
+
+说明：
+
+- `failed` 必须为空。
+- `warnings` 可以存在，但必须人工确认；例如 draft PR 没有远端 checks 时会报 `pr_checks_present` warning。
+- 若只做快速本地检查，可加 `-SkipSmoke`，但不能用于最终 release。
+
 PowerShell 解析：
 
 ```powershell
