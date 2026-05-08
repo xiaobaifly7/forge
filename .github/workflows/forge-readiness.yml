@@ -35,10 +35,15 @@ jobs:
         run: |
           pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . -Json
 
+      - name: Tracked examples
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeTrackedExamples.ps1 -RepoPath . -Json
+
       - name: Smoke
         shell: pwsh
         run: |
-          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog -SkipReleaseReadiness
 
       - name: Release readiness
         shell: pwsh

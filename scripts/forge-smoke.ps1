@@ -4,6 +4,7 @@ param(
     [switch]$NoLog,
     [switch]$LiveClaudeRoute,
     [switch]$IncludeLiveClaudeRoute,
+    [switch]$SkipReleaseReadiness,
     [int]$LiveRouteTimeoutSeconds = 120
 )
 
@@ -641,19 +642,26 @@ if ($docsHealthFailed -gt 0) {
     exit 1
 }
 
-# Release readiness smoke: aggregate gates must stay machine-readable without
-# recursively invoking the full smoke suite.
-$readinessJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeReleaseReadiness.ps1') -RepoPath (Get-Location).Path -SkipSmoke -Json
-$readinessExit = $LASTEXITCODE
-try { $readiness = $readinessJson | ConvertFrom-Json -AsHashtable } catch { $readiness = @{ ok = $false; failed = @("invalid_readiness_output") } }
-$readinessPassed = if ($readinessExit -eq 0 -and [bool]$readiness.ok) { 1 } else { 0 }
-$readinessFailed = if ($readinessPassed -eq 1) { 0 } else { 1 }
-Write-Output "release_readiness_total=1"
-Write-Output "release_readiness_passed=$readinessPassed"
-Write-Output "release_readiness_failed=$readinessFailed"
-if ($readinessFailed -gt 0) {
-    $readiness | ConvertTo-Json -Depth 8
-    exit 1
+# Release readiness is a separate CI layer. Keep it optional here so smoke can
+# validate runtime behavior without recursively invoking aggregate gates.
+if ($SkipReleaseReadiness) {
+    Write-Output "release_readiness_total=0"
+    Write-Output "release_readiness_passed=0"
+    Write-Output "release_readiness_failed=0"
+    Write-Output "release_readiness_skipped=1"
+} else {
+    $readinessJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeReleaseReadiness.ps1') -RepoPath (Get-Location).Path -SkipSmoke -Json
+    $readinessExit = $LASTEXITCODE
+    try { $readiness = $readinessJson | ConvertFrom-Json -AsHashtable } catch { $readiness = @{ ok = $false; failed = @("invalid_readiness_output"); raw_output = $readinessJson } }
+    $readinessPassed = if ($readinessExit -eq 0 -and [bool]$readiness.ok) { 1 } else { 0 }
+    $readinessFailed = if ($readinessPassed -eq 1) { 0 } else { 1 }
+    Write-Output "release_readiness_total=1"
+    Write-Output "release_readiness_passed=$readinessPassed"
+    Write-Output "release_readiness_failed=$readinessFailed"
+    if ($readinessFailed -gt 0) {
+        $readiness | ConvertTo-Json -Depth 8
+        exit 1
+    }
 }
 
 Write-Output "highrisk_gate_total=$hrTotal"
