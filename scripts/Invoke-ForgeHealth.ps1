@@ -107,7 +107,8 @@ function Test-JsonFile {
     "ok: $Path"
 }
 
-$claudeVersion = (& claude --version 2>$null | Select-Object -First 1)
+$claudeCommand = Get-Command claude -ErrorAction SilentlyContinue
+$claudeVersion = if ($claudeCommand) { (& $claudeCommand.Source --version 2>$null | Select-Object -First 1) } else { 'not-found' }
 $repoClaude = Join-Path $RepoPath '.claude'
 $settingsPath = Join-Path $repoClaude 'settings.json'
 $statePath = Join-Path $repoClaude 'forge-session-state.json'
