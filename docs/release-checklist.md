@@ -68,6 +68,16 @@ smoke：
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog
 ```
 
+CI 分层 smoke：
+
+```powershell
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeTrackedExamples.ps1 -RepoPath . -Json
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog -SkipReleaseReadiness
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -SkipSmoke -Json
+```
+
+说明：CI 用 `-SkipReleaseReadiness` 避免 smoke 嵌套 aggregate readiness；最终 release 仍可跑完整 smoke。
+
 Git 检查：
 
 ```powershell
