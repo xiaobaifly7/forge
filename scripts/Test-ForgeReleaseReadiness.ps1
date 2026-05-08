@@ -2,6 +2,7 @@
 param(
     [string]$RepoPath = ".",
     [string]$PrNumber = "",
+    [switch]$AllowMissingPrChecks,
     [switch]$SkipSmoke,
     [switch]$Json
 )
@@ -96,8 +97,9 @@ if (-not [string]::IsNullOrWhiteSpace($PrNumber)) {
     $pr = $null
     try { $pr = $prOutput | ConvertFrom-Json -AsHashtable } catch {}
     $checksCount = if ($pr -and $pr.ContainsKey("statusCheckRollup")) { @($pr.statusCheckRollup).Count } else { 0 }
-    $checksOk = $prExit -eq 0 -and $pr -and $checksCount -gt 0
-    Add-ReadinessCheck -Name "pr_checks_present" -Ok $checksOk -Severity "warning" -Summary "status_checks=$checksCount" -Details $pr
+    $checksOk = $prExit -eq 0 -and $pr -and ($checksCount -gt 0 -or $AllowMissingPrChecks)
+    $checksSummary = if ($AllowMissingPrChecks -and $checksCount -eq 0) { "status_checks=0 allow_missing=true" } else { "status_checks=$checksCount" }
+    Add-ReadinessCheck -Name "pr_checks_present" -Ok $checksOk -Severity "warning" -Summary $checksSummary -Details $pr
     $prClean = $prExit -eq 0 -and $pr -and [string]$pr.state -eq "OPEN" -and [string]$pr.mergeStateStatus -eq "CLEAN"
     Add-ReadinessCheck -Name "pr_merge_state" -Ok $prClean -Summary "state=$($pr.state) merge=$($pr.mergeStateStatus)" -Details $pr
 }

@@ -1,0 +1,51 @@
+name: Forge Readiness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+jobs:
+  readiness:
+    name: Forge readiness
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -Include *.ps1,*.psm1 -File
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) {
+              throw "$($file.FullName): $($errors[0].Message)"
+            }
+          }
+
+      - name: Quick health
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . -Json
+
+      - name: Smoke
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -NoLog
+
+      - name: Release readiness
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -SkipSmoke -Json
+
+      - name: Git whitespace check
+        shell: pwsh
+        run: |
+          git diff --check

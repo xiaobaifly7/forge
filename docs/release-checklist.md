@@ -24,11 +24,18 @@
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -Json
 ```
 
+本地 pre-push 检查：
+
+```powershell
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -AllowMissingPrChecks -Json
+```
+
 说明：
 
 - `failed` 必须为空。
 - `warnings` 可以存在，但必须人工确认；例如 draft PR 没有远端 checks 时会报 `pr_checks_present` warning。
 - 若只做快速本地检查，可加 `-SkipSmoke`，但不能用于最终 release。
+- `-AllowMissingPrChecks` 只用于本地 pre-push；PR 转 ready 前应移除该参数，确认 GitHub checks 已存在。
 
 PowerShell 解析：
 
