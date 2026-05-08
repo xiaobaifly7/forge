@@ -300,7 +300,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "spec finding idempotency smoke failed" }
     $smokeFindingPath = Join-Path $taskKernelWritableSmokePath ".forge\spec\guides\$(Get-Date -Format 'yyyy-MM-dd')-smoke-finding.md"
     $smokeFindingContent = Get-Content -LiteralPath $smokeFindingPath -Raw -Encoding UTF8
-    if (@([regex]::Matches($smokeFindingContent, '(?m)^# Smoke Finding$')).Count -ne 1) { throw "spec finding duplicate smoke failed" }
+    if (@([regex]::Matches($smokeFindingContent, '(?m)^# Smoke Finding\r?$')).Count -ne 1) { throw "spec finding duplicate smoke failed" }
     $adapterKernelSmokePassed++
     $smokeHistoryDir = Join-Path $taskKernelWritableSmokePath ".forge\spec\guides\.history"
     if (-not (Test-Path -LiteralPath $smokeHistoryDir)) { throw "spec finding history smoke failed" }
