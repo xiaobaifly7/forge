@@ -628,7 +628,7 @@ if ($adapterFailed -gt 0) {
 }
 
 # Forge docs health smoke: command/skill/docs boundaries must not drift.
-$docsHealthJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1') -Json
+$docsHealthJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1') -ClaudeRoot (Get-Location).Path -Json
 $docsHealthExit = $LASTEXITCODE
 try { $docsHealth = $docsHealthJson | ConvertFrom-Json -AsHashtable } catch { $docsHealth = @{ ok = $false; issues = @("invalid_docs_health_output") } }
 $docsHealthPassed = if ($docsHealthExit -eq 0 -and [bool]$docsHealth.ok) { 1 } else { 0 }
