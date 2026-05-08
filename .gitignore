@@ -18,6 +18,10 @@
 .specs/
 *.log
 *.jsonl
+!examples/trellis-project/.trellis/tasks/*/implement.jsonl
+!examples/trellis-project/.trellis/tasks/*/check.jsonl
+!examples/task-kernel-project/.forge/tasks/*/implement.jsonl
+!examples/task-kernel-project/.forge/tasks/*/check.jsonl
 *.bak
 *.tmp
 node_modules/
