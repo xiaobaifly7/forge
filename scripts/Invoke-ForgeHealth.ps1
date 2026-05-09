@@ -153,7 +153,29 @@ $failed=@($checks | Where-Object { -not $_.ok -and $_.required })
 $warnings=@($checks | Where-Object { -not $_.ok -and -not $_.required })
 $result=[ordered]@{ ok=($failed.Count -eq 0); mode=$Mode; repo=$RepoPath; checked_at=(Get-Date).ToString('o'); claude_version=$claudeVersion; live_route_log_path=$LiveRouteLogPath; checks=@($checks); failed=@($failed | ForEach-Object {$_.name}); warnings=@($warnings | ForEach-Object {$_.name}) }
 if($Json){ $result | ConvertTo-Json -Depth 12 }
-else { if($result.ok){'forge_health=ok'}else{'forge_health=fail'}; foreach($c in $checks){"check=$($c.name) severity=$($c.severity) ok=$($c.ok) exit=$($c.exit_code) duration_ms=$($c.duration_ms)"} }
+else {
+    if($result.ok){'Forge health: PASS'}else{'Forge health: FAIL'}
+    "Mode: $Mode"
+    "Repo: $RepoPath"
+    "Summary: checks=$(@($checks).Count) failed=$(@($result.failed).Count) warnings=$(@($result.warnings).Count)"
+    ''
+    'Checks:'
+    foreach($c in $checks){
+        $label = if($c.ok){'PASS'}elseif($c.severity -eq 'warning'){'WARN'}else{'FAIL'}
+        $line = "- $($c.name): $label exit=$($c.exit_code) duration_ms=$($c.duration_ms)"
+        if(-not [string]::IsNullOrWhiteSpace($c.summary)){ $line += " -- $($c.summary)" }
+        $line
+    }
+    $actionable = @($checks | Where-Object { -not $_.ok })
+    if($actionable.Count -gt 0){
+        ''
+        'Next:'
+        foreach($c in $actionable){
+            if($c.required){"- $($c.name): fix this required check before continuing."}
+            else{"- $($c.name): warning only; review before release."}
+        }
+    }
+}
 if(-not $result.ok){ exit 1 }
 
 

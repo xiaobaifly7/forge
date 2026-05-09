@@ -13,6 +13,7 @@
 
 - `README.md` 说明 Forge 的定位：Claude Code workflow control plane / runtime enforcement adapter。
 - `docs/adapter-contract.md` 说明外部工具如何被可选调用。
+- `docs/architecture/boundaries.md` 说明 Forge 与 Codex、Claude Code、OMX、GitNexus、flow-kit、Trellis、CI 的职责边界。
 - `docs/forge-workflow-boundary.md` 说明 Forge 不替代 Markdown-first workflow kits。
 - `LICENSE` 已确认，当前为 MIT License。
 

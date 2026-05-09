@@ -16,6 +16,24 @@ This repository is the extracted, public-friendly source layout for a local Forg
 - PowerShell health and smoke checks for docs, workspace manifest, M1 compliance, live route freshness, and session state.
 - Optional adapter points for external workflow tools such as Superpowers, GSD, Task Master, gstack, GitNexus, UI review, and lint tools.
 
+## Happy Path
+
+Most daily use should fit three commands:
+
+```powershell
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath .
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\New-ForgeTask.ps1 -RepoPath . -Title "Describe the task"
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath .
+```
+
+Use them as:
+
+1. **doctor**: check whether Forge can safely run in this repo.
+2. **task new**: create a tracked task artifact before agent work.
+3. **verify**: produce a release-readiness verdict before PR or merge.
+
+Forge keeps deeper adapter, baseline, and smoke details behind those commands. If a check fails, the verdict should name the failing layer and the next fix command.
+
 ## Repository Layout
 
 ```text
@@ -54,6 +72,7 @@ pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\
 ## Contributing And Releases
 
 - Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Architecture boundaries: [docs/architecture/boundaries.md](./docs/architecture/boundaries.md)
 - Release checklist: [docs/release-checklist.md](./docs/release-checklist.md)
 - License: [MIT](./LICENSE)
 - Minimal example: [examples/minimal-project](./examples/minimal-project)

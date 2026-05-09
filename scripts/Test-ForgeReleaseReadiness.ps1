@@ -63,6 +63,20 @@ function Invoke-Git {
     return [ordered]@{ exit_code = $LASTEXITCODE; output = (@($output) -join "`n") }
 }
 
+function Get-ReadinessFixHint {
+    param([string]$Name)
+    switch ($Name) {
+        { $_ -like "adapter_*_baseline" } { return "Run Compare-ForgeExternalAdapterRef.ps1 -Name <adapter> -RecordBaseline after reviewing upstream drift." }
+        "quick_health" { return "Run Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . and fix failed health checks." }
+        "smoke" { return "Run forge-smoke.ps1 -NoLog and fix the first failed smoke layer." }
+        "diff_check" { return "Run git diff --check and remove whitespace/conflict-marker errors." }
+        "worktree_status" { return "Commit, stash, or intentionally document the remaining worktree changes." }
+        "pr_checks_present" { return "Wait for GitHub checks or rerun with -AllowMissingPrChecks only for local pre-push." }
+        "pr_merge_state" { return "Resolve PR merge state before marking release ready." }
+        default { return "Inspect check details and rerun readiness." }
+    }
+}
+
 $manifests = @("flow-kit", "trellis")
 foreach ($name in $manifests) {
     $manifestPath = Join-Path $RepoRoot ("adapters\external\" + $name + ".yaml")
@@ -86,7 +100,8 @@ if (-not $SkipSmoke) {
 }
 
 $diffCheck = Invoke-Git -Arguments @("diff", "--check")
-Add-ReadinessCheck -Name "diff_check" -Ok ($diffCheck.exit_code -eq 0) -Summary $diffCheck.output -Details $diffCheck.output
+$diffSummary = if ($diffCheck.exit_code -eq 0) { "" } else { $diffCheck.output }
+Add-ReadinessCheck -Name "diff_check" -Ok ($diffCheck.exit_code -eq 0) -Summary $diffSummary -Details $diffCheck.output
 
 $status = Invoke-Git -Arguments @("status", "--porcelain=v1")
 Add-ReadinessCheck -Name "worktree_status" -Ok ($status.exit_code -eq 0 -and [string]::IsNullOrWhiteSpace($status.output)) -Severity "warning" -Summary $status.output -Details $status.output
@@ -118,9 +133,25 @@ $result = [ordered]@{
 if ($Json) {
     $result | ConvertTo-Json -Depth 12
 } else {
-    if ($result.ok) { "forge_release_readiness=ok" } else { "forge_release_readiness=fail" }
+    if ($result.ok) { "Forge release readiness: PASS" } else { "Forge release readiness: FAIL" }
+    "Repo: $RepoRoot"
+    "Checked: $($result.checked_at)"
+    "Summary: checks=$(@($checks).Count) failed=$(@($result.failed).Count) warnings=$(@($result.warnings).Count)"
+    ""
+    "Checks:"
     foreach ($check in $checks) {
-        "check=$($check.name) severity=$($check.severity) ok=$($check.ok) summary=$($check.summary)"
+        $label = if ($check.ok) { "PASS" } elseif ($check.severity -eq "warning") { "WARN" } else { "FAIL" }
+        $line = "- $($check.name): $label"
+        if (-not [string]::IsNullOrWhiteSpace($check.summary)) { $line += " -- $($check.summary)" }
+        $line
+    }
+    $actionable = @($checks | Where-Object { -not $_.ok })
+    if ($actionable.Count -gt 0) {
+        ""
+        "Next:"
+        foreach ($check in $actionable) {
+            "- $($check.name): $(Get-ReadinessFixHint -Name $check.name)"
+        }
     }
 }
 
