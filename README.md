@@ -21,9 +21,9 @@ This repository is the extracted, public-friendly source layout for a local Forg
 Most daily use should fit three commands:
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath .
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\New-ForgeTask.ps1 -RepoPath . -Title "Describe the task"
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath .
+forge doctor
+forge task new -Title "Describe the task"
+forge verify
 ```
 
 Use them as:
@@ -53,14 +53,14 @@ From this repository root:
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-ForgeLocal.ps1 -RepoPath "<repo>"
 ```
 
-The installer copies commands, skill, docs, scripts, and hooks into the current user's Claude Code configuration and the target project's `.claude/hooks` directory.
+The installer copies commands, skill, docs, scripts, and hooks into the current user's Claude Code configuration and the target project's `.claude/hooks` directory. It also writes `forge.cmd` to `%USERPROFILE%\.local\bin`, so `forge doctor`, `forge task new`, and `forge verify` work once that directory is on `PATH`.
 
 ## Health Check
 
 After installation:
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Quick -RepoPath "<repo>"
+forge doctor -RepoPath "<repo>"
 ```
 
 For deeper validation:

@@ -22,6 +22,12 @@
 一键 ready 检查：
 
 ```powershell
+forge verify -RepoPath . -PrNumber <pr-number>
+```
+
+等价底层命令：
+
+```powershell
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -Json
 ```
 

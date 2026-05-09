@@ -138,8 +138,7 @@ function Classify-ChangedFiles {
     return "NO_IMPACT"
 }
 
-$scriptDir = Split-Path -Parent $PSCommandPath
-$forgeRoot = Split-Path -Parent $scriptDir
+$forgeRoot = (Resolve-Path -LiteralPath $RepoPath).Path
 $manifestPath = Join-Path $forgeRoot ("adapters\external\" + $Name + ".yaml")
 $manifest = Read-Manifest -Path $manifestPath
 $effectiveBase = if (Test-UsableRef $BaseRef) { $BaseRef } elseif (Test-UsableRef ([string]$manifest.last_audited_ref)) { [string]$manifest.last_audited_ref } else { [string]$manifest.pinned_ref }
