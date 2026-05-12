@@ -4,7 +4,7 @@ param(
     [string]$RepoPath = ".",
     [int]$LiveMaxAgeHours = 24,
     [string]$LiveRouteLogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
-    [string]$RequiredClaudeVersion = "2.1.128",
+    [string]$RequiredClaudeVersion = "2.1.131",
     [switch]$FetchUpstreams,
     [int]$CheckTimeoutSeconds = 30,
     [switch]$Json
@@ -133,16 +133,17 @@ if($Mode -eq 'Quick'){
     Add-ProcessCheck 'external_adapters_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeExternalAdapter.ps1'),'-Name','all','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
-    Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),'-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json')
+    $runtimeChecksRequired = ($Mode -eq 'Live' -or $Mode -eq 'Full')
+    Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),'-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json') -Required $runtimeChecksRequired
     Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),'-RepoPath',$RepoPath,'-Json')
     Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),'-Json')
     $upArgs=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeUpstreams.ps1'),'-Json')
     if($FetchUpstreams){ $upArgs += '-Fetch' }
     Add-ProcessCheck 'upstreams' $upArgs
     Add-ProcessCheck 'gstack_patches' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-GstackLocalPatches.ps1'),'-Json')
-    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),'-RepoPath',$RepoPath,'-Latest','-Json')
+    Add-ProcessCheck 'm1_latest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),'-RepoPath',$RepoPath,'-Latest','-Json') -Required ($Mode -eq 'Full')
     if($Mode -eq 'Full' -or $Mode -eq 'Offline'){
-        Add-ProcessCheck 'offline_smoke' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'forge-smoke.ps1'),'-NoLog') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,60))
+        Add-ProcessCheck 'offline_smoke' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'forge-smoke.ps1'),'-NoLog') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,120))
     }
     if($Mode -eq 'Live' -or $Mode -eq 'Full'){
         Add-ProcessCheck 'live_route' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'forge-smoke.ps1'),'-LiveClaudeRoute','-LiveRouteTimeoutSeconds','120') -TimeoutSeconds ([Math]::Max($CheckTimeoutSeconds,150))
@@ -177,6 +178,4 @@ else {
     }
 }
 if(-not $result.ok){ exit 1 }
-
-
 

@@ -68,7 +68,7 @@ function Get-ReadinessFixHint {
     switch ($Name) {
         { $_ -like "adapter_*_baseline" } { return "Run Compare-ForgeExternalAdapterRef.ps1 -Name <adapter> -RecordBaseline after reviewing upstream drift." }
         "quick_health" { return "Run Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . and fix failed health checks." }
-        "smoke" { return "Run forge-smoke.ps1 -NoLog and fix the first failed smoke layer." }
+        "smoke" { return "Run forge-smoke.ps1 -NoLog -SkipReleaseReadiness and fix the first failed smoke layer." }
         "diff_check" { return "Run git diff --check and remove whitespace/conflict-marker errors." }
         "worktree_status" { return "Commit, stash, or intentionally document the remaining worktree changes." }
         "pr_checks_present" { return "Wait for GitHub checks or rerun with -AllowMissingPrChecks only for local pre-push." }
@@ -93,7 +93,7 @@ $warningCount = if ($health.json -and $health.json.ContainsKey("warnings")) { @(
 Add-ReadinessCheck -Name "quick_health" -Ok $healthOk -Summary "warnings=$warningCount" -Details $health.json
 
 if (-not $SkipSmoke) {
-    $smoke = Invoke-ProcessJson -Arguments @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "forge-smoke.ps1"), "-NoLog") -TimeoutSeconds 120
+    $smoke = Invoke-ProcessJson -Arguments @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "forge-smoke.ps1"), "-NoLog", "-SkipReleaseReadiness") -TimeoutSeconds 120
     Add-ReadinessCheck -Name "smoke" -Ok ($smoke.exit_code -eq 0) -Summary (($smoke.output -split "`r?`n" | Where-Object { $_ -match '_failed=0$|_passed=' } | Select-Object -Last 8) -join "; ") -Details $smoke.output
 } else {
     Add-ReadinessCheck -Name "smoke" -Ok $true -Severity "warning" -Summary "skipped"

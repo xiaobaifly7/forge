@@ -11,6 +11,18 @@ param(
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $PSCommandPath
 $RepoRootForScripts = Split-Path -Parent $ScriptDir
+$sourcePath = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
+if (Test-Path -LiteralPath $sourcePath) {
+    foreach ($line in Get-Content -LiteralPath $sourcePath -Encoding UTF8) {
+        if ($line -match '^forge_source_repo=(.+)$') {
+            $candidateRepoRoot = $Matches[1]
+            if ((Test-Path -LiteralPath (Join-Path $candidateRepoRoot "examples")) -and (Test-Path -LiteralPath (Join-Path $candidateRepoRoot "hooks"))) {
+                $RepoRootForScripts = $candidateRepoRoot
+            }
+            break
+        }
+    }
+}
 $HookScriptPath = Join-Path $RepoRootForScripts "hooks\forge-pretool-guard.ps1"
 $AuditScriptPath = Join-Path $RepoRootForScripts "hooks\forge-session-audit.ps1"
 
@@ -674,7 +686,4 @@ if ($failed -gt 0) {
     exit 1
 }
 exit 0
-
-
-
 
