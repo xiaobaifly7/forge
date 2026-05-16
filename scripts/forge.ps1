@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -96,9 +96,36 @@ switch ($Command) {
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Sync-ForgeProjects.ps1" -Arguments $args
     }
+    "projects" {
+        $args = @($Subcommand)
+        if (-not [string]::IsNullOrWhiteSpace($RepoPath) -and $RepoPath -ne ".") { $args += @("-RepoPath", $RepoPath) }
+        if (-not [string]::IsNullOrWhiteSpace($Name)) { $args += @("-Name", $Name) }
+        if (-not [string]::IsNullOrWhiteSpace($RegistryPath)) { $args += @("-RegistryPath", $RegistryPath) }
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Manage-ForgeProjects.ps1" -Arguments $args
+    }
     "version" {
         Write-Output "forge_repo=$RepoRoot"
         Write-Output "forge_installed_script=$PSCommandPath"
+        $versionPath = Join-Path $RepoRoot "version.json"
+        if (-not (Test-Path -LiteralPath $versionPath)) {
+            $sourcePathForVersion = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
+            if (Test-Path -LiteralPath $sourcePathForVersion) {
+                foreach ($line in Get-Content -LiteralPath $sourcePathForVersion -Encoding UTF8) {
+                    if ($line -match '^forge_source_repo=(.+)$') {
+                        $candidateVersionPath = Join-Path $Matches[1] "version.json"
+                        if (Test-Path -LiteralPath $candidateVersionPath) { $versionPath = $candidateVersionPath; break }
+                    }
+                }
+            }
+        }
+        if (Test-Path -LiteralPath $versionPath) {
+            try {
+                $versionInfo = Get-Content -LiteralPath $versionPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                Write-Output "forge_version=$($versionInfo.version)"
+                Write-Output "forge_channel=$($versionInfo.channel)"
+            } catch {}
+        }
         try {
             $sha = & git -C $RepoRoot rev-parse --short HEAD 2>$null
             if ($LASTEXITCODE -eq 0 -and $sha) { Write-Output "forge_commit=$sha" }

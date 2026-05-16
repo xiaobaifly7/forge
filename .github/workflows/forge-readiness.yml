@@ -5,12 +5,13 @@ on:
   push:
     branches:
       - main
+      - codex/absorb-flowkit-trellis
 
 jobs:
   readiness:
     name: Forge readiness
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -33,6 +34,16 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . -Json
+
+      - name: Sync audit
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Sync-ForgeProjects.ps1 -RepoPath . -Json
+
+      - name: Offline health
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Offline -RepoPath . -LiveMaxAgeHours 999999 -Json
 
       - name: Tracked examples
         shell: pwsh
