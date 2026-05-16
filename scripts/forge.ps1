@@ -14,6 +14,7 @@ param(
     [switch]$Json,
     [switch]$SkipSmoke,
     [switch]$Apply,
+    [string]$RegistryPath = "",
     [string[]]$SearchRoot = @(),
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArgs
@@ -32,7 +33,7 @@ function Show-ForgeHelp {
     Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Json]"
     Write-Output "  forge smoke [-RepoPath .]"
     Write-Output "  forge install -RepoPath <repo>"
-    Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-Apply] [-Json]"
+    Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
     Write-Output "  forge version"
 }
 
@@ -88,8 +89,9 @@ switch ($Command) {
     }
     "sync-all" {
         $args = @()
-        if (-not [string]::IsNullOrWhiteSpace($RepoPath)) { $args += @("-RepoPath", $RepoPath) }
+        if (-not [string]::IsNullOrWhiteSpace($RepoPath) -and $RepoPath -ne ".") { $args += @("-RepoPath", $RepoPath) }
         foreach ($root in @($SearchRoot)) { if (-not [string]::IsNullOrWhiteSpace($root)) { $args += @("-SearchRoot", $root) } }
+        if (-not [string]::IsNullOrWhiteSpace($RegistryPath)) { $args += @("-RegistryPath", $RegistryPath) }
         if ($Apply) { $args += "-Apply" }
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Sync-ForgeProjects.ps1" -Arguments $args

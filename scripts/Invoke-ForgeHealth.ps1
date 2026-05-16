@@ -4,7 +4,7 @@ param(
     [string]$RepoPath = ".",
     [int]$LiveMaxAgeHours = 24,
     [string]$LiveRouteLogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
-    [string]$RequiredClaudeVersion = "2.1.131",
+    [string]$RequiredClaudeVersion = "2.1.143",
     [switch]$FetchUpstreams,
     [int]$CheckTimeoutSeconds = 30,
     [switch]$Json
@@ -125,6 +125,7 @@ if($Mode -eq 'Quick'){
     Add-ProcessCheck 'task_kernel_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeTaskKernel.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_adapters_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeExternalAdapter.ps1'),'-Name','all','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
 } else {
     Add-ProcessCheck 'docs_health' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1'),'-ClaudeRoot',$ClaudeRoot,'-Json')
@@ -132,11 +133,12 @@ if($Mode -eq 'Quick'){
     Add-ProcessCheck 'task_kernel_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeTaskKernel.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_adapters_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeExternalAdapter.ps1'),'-Name','all','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     $runtimeChecksRequired = ($Mode -eq 'Live' -or $Mode -eq 'Full')
     Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),'-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json') -Required $runtimeChecksRequired
     Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),'-RepoPath',$RepoPath,'-Json')
-    Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),'-Json')
+    Add-ProcessCheck 'audit_rotation' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),'-RepoPath',$RepoPath,'-SkipCreate','-Json')
     $upArgs=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeUpstreams.ps1'),'-Json')
     if($FetchUpstreams){ $upArgs += '-Fetch' }
     Add-ProcessCheck 'upstreams' $upArgs
@@ -178,4 +180,3 @@ else {
     }
 }
 if(-not $result.ok){ exit 1 }
-

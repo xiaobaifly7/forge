@@ -2,6 +2,7 @@
 param(
     [string[]]$RepoPath = @(),
     [string[]]$SearchRoot = @(),
+    [string]$RegistryPath = "",
     [string]$ClaudeRoot = (Join-Path $env:USERPROFILE ".claude"),
     [string]$BinDir = (Join-Path $env:USERPROFILE ".local\bin"),
     [switch]$Apply,
@@ -53,8 +54,31 @@ function Add-RepoCandidate {
     if (-not $Items.Contains($resolved)) { [void]$Items.Add($resolved) }
 }
 
+function Add-RegistryRepos {
+    param([System.Collections.Generic.List[string]]$Items, [string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) { return }
+    $registry = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+    foreach ($entry in @($registry.projects)) {
+        $enabled = $true
+        if ($entry.ContainsKey('enabled')) { $enabled = [bool]$entry.enabled }
+        if (-not $enabled) { continue }
+        $repo = [string]$entry.path
+        if (-not [string]::IsNullOrWhiteSpace($repo)) { Add-RepoCandidate -Items $Items -Path $repo }
+    }
+}
+
 $candidates = [System.Collections.Generic.List[string]]::new()
 foreach ($path in @($RepoPath)) { Add-RepoCandidate -Items $candidates -Path $path }
+
+$registryCandidates = @()
+if ($RegistryPath) {
+    $registryCandidates += $RegistryPath
+} elseif ($RepoPath.Count -lt 1 -and $SearchRoot.Count -lt 1) {
+    $registryCandidates += (Join-Path $ClaudeRoot "forge-projects.json")
+    $registryCandidates += (Join-Path $ForgeRoot ".claude\forge-projects.json")
+}
+foreach ($candidate in $registryCandidates) { Add-RegistryRepos -Items $candidates -Path $candidate }
+
 foreach ($root in @($SearchRoot)) {
     if ([string]::IsNullOrWhiteSpace($root) -or -not (Test-Path -LiteralPath $root)) { continue }
     foreach ($gitDir in Get-ChildItem -LiteralPath $root -Directory -Recurse -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq ".git" }) {
@@ -78,13 +102,14 @@ $results = @()
 foreach ($repo in @($candidates)) {
     $hookResults = @()
     $needsSync = -not $globalScriptOk
+    $isSourceRepo = ([System.IO.Path]::GetFullPath($repo).TrimEnd('\','/') -ieq [System.IO.Path]::GetFullPath($ForgeRoot).TrimEnd('\','/'))
     foreach ($name in $HookNames) {
         $src = Join-Path $ForgeRoot ("hooks\" + $name)
         $dst = Join-Path $repo (".claude\hooks\" + $name)
         $srcHash = Get-Sha256OrNull $src
         $dstHash = Get-Sha256OrNull $dst
         $matches = ($srcHash -and $dstHash -and $srcHash -eq $dstHash)
-        if (-not $matches -and -not ([System.IO.Path]::GetFullPath($repo).TrimEnd('\','/') -ieq [System.IO.Path]::GetFullPath($ForgeRoot).TrimEnd('\','/'))) { $needsSync = $true }
+        if (-not $matches -and -not $isSourceRepo) { $needsSync = $true }
         $hookResults += [ordered]@{ name=$name; exists=[bool]$dstHash; matches_source=[bool]$matches }
     }
 
@@ -103,10 +128,12 @@ foreach ($repo in @($candidates)) {
         }
     }
 
+    $repoNeedsSyncAfter = (-not $globalScriptOk)
+    foreach ($hook in @($hookResults)) { if (-not $hook.matches_source -and -not $isSourceRepo) { $repoNeedsSyncAfter = $true } }
     $results += [ordered]@{
         repo = $repo
-        is_source_repo = ([System.IO.Path]::GetFullPath($repo).TrimEnd('\','/') -ieq [System.IO.Path]::GetFullPath($ForgeRoot).TrimEnd('\','/'))
-        needs_sync = [bool]$needsSync
+        is_source_repo = $isSourceRepo
+        needs_sync = [bool]$repoNeedsSyncAfter
         hooks = @($hookResults)
         install_exit = $installExit
         install_output = @($installOutput | ForEach-Object { [string]$_ })
@@ -114,7 +141,7 @@ foreach ($repo in @($candidates)) {
 }
 
 $afterGlobalOk = ((Get-Sha256OrNull (Join-Path $ScriptDir "forge.ps1")) -eq (Get-Sha256OrNull $globalScript))
-$remaining = @($results | Where-Object { @($_.hooks | Where-Object { -not $_.matches_source -and -not $_.exists }).Count -gt 0 })
+$remaining = @($results | Where-Object { [bool]$_.needs_sync })
 $result = [ordered]@{
     ok = ($remaining.Count -eq 0 -and $afterGlobalOk)
     action = if ($Apply) { "sync" } else { "audit" }
@@ -138,4 +165,3 @@ else {
 }
 if (-not $result.ok) { exit 1 }
 exit 0
-
