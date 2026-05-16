@@ -22,26 +22,34 @@
 一键 ready 检查：
 
 ```powershell
-forge verify -RepoPath . -PrNumber <pr-number>
+forge verify -RepoPath . -PrNumber <pr-number> -Full
 ```
 
 等价底层命令：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -Json
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -Full -Json
 ```
 
 本地 pre-push 检查：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -PrNumber <pr-number> -AllowMissingPrChecks -Json
+forge verify -RepoPath .
+```
+
+工作流入口审计：
+
+```powershell
+forge workflows -RepoPath . -Json
 ```
 
 说明：
 
 - `failed` 必须为空。
 - `warnings` 可以存在，但必须人工确认；例如 draft PR 没有远端 checks 时会报 `pr_checks_present` warning。
-- 若只做快速本地检查，可加 `-SkipSmoke`，但不能用于最终 release。
+- 日常本地检查用默认 `forge verify -RepoPath .`；它使用 `Lite` health + minimal smoke，不依赖外网。
+- `-SkipSmoke` 只用于定位 health/readiness 问题，不能用于最终 release。
+- 最终 release 使用 `-Full`，保留完整 smoke、PR checks 和外部 ref compare。
 - `-AllowMissingPrChecks` 只用于本地 pre-push；PR 转 ready 前应移除该参数，确认 GitHub checks 已存在。
 
 PowerShell 解析：
@@ -62,6 +70,12 @@ foreach ($f in $files) {
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeDocsHealth.ps1 -ClaudeRoot . -Json
 ```
 
+gstack 本地 patch 导出：
+
+```powershell
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Export-GstackLocalPatches.ps1 -Json
+```
+
 workspace manifest：
 
 ```powershell
@@ -78,9 +92,9 @@ pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 
 CI 分层 smoke：
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeTrackedExamples.ps1 -RepoPath . -Json
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog -SkipReleaseReadiness
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -SkipSmoke -Json
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeCliBehavior.ps1 -RepoPath . -SkipFull
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -NoLog -SkipReleaseReadiness -Quick
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -Full -Json
 ```
 
 说明：CI 用 `-SkipReleaseReadiness` 避免 smoke 嵌套 aggregate readiness；最终 release 仍可跑完整 smoke。

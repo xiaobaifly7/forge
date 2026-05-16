@@ -3,8 +3,8 @@ upstream: https://github.com/rihebty/flow-kit
 mode: optional-adapter
 absorbed_as: methodology
 pinned_ref: 122261bca37930da712f6aaacf6f36e86ed99668
-last_audited_ref: 122261bca37930da712f6aaacf6f36e86ed99668
-last_audited: 2026-05-08T17:58:00+08:00
+last_audited_ref: 9b5dda7206ae841230f118348d660ad8d0ae2830
+last_audited: 2026-05-17T00:26:48.1586587+08:00
 status: audit-only
 owned_by: Forge
 update_policy:

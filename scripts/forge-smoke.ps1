@@ -5,6 +5,9 @@ param(
     [switch]$LiveClaudeRoute,
     [switch]$IncludeLiveClaudeRoute,
     [switch]$SkipReleaseReadiness,
+    [switch]$Quick,
+    [switch]$Minimal,
+    [switch]$NoExternalRefCompare,
     [int]$LiveRouteTimeoutSeconds = 120
 )
 
@@ -25,6 +28,43 @@ if (Test-Path -LiteralPath $sourcePath) {
 }
 $HookScriptPath = Join-Path $RepoRootForScripts "hooks\forge-pretool-guard.ps1"
 $AuditScriptPath = Join-Path $RepoRootForScripts "hooks\forge-session-audit.ps1"
+
+function Write-SmokeProgress {
+    param([string]$Message)
+    [Console]::Out.WriteLine("[smoke] $Message")
+}
+
+function Start-SmokeStep {
+    param([string]$Name)
+    Write-SmokeProgress -Message "start $Name"
+    return [System.Diagnostics.Stopwatch]::StartNew()
+}
+
+function Complete-SmokeStep {
+    param(
+        [string]$Name,
+        [bool]$Ok,
+        [System.Diagnostics.Stopwatch]$Timer
+    )
+    if ($Timer) { $Timer.Stop() }
+    $durationMs = if ($Timer) { $Timer.ElapsedMilliseconds } else { 0 }
+    $label = if ($Ok) { "pass" } else { "fail" }
+    Write-SmokeProgress -Message "$label $Name duration_ms=$durationMs"
+    Write-Output "${Name}_duration_ms=$durationMs"
+}
+
+function Write-SkippedGate {
+    param(
+        [string]$Name,
+        [string]$Prefix
+    )
+    Write-SmokeProgress -Message "skip $Name"
+    Write-Output "${Prefix}_total=0"
+    Write-Output "${Prefix}_passed=0"
+    Write-Output "${Prefix}_failed=0"
+    Write-Output "${Prefix}_skipped=1"
+    Write-Output "${Prefix}_duration_ms=0"
+}
 
 function Resolve-ExplicitMode {
     param([string]$Text)
@@ -271,35 +311,58 @@ if (-not $NoLog) {
 if ($LiveClaudeRoute) { Invoke-LiveClaudeRouteSmoke -Raw $raw -LogPath $LogPath -NoLog ([bool]$NoLog) -TimeoutSeconds $LiveRouteTimeoutSeconds; exit 0 }
 if ($IncludeLiveClaudeRoute) { Invoke-LiveClaudeRouteSmoke -Raw $raw -LogPath $LogPath -NoLog ([bool]$NoLog) -TimeoutSeconds $LiveRouteTimeoutSeconds }
 
+$smokeMode = if ($Minimal) { "minimal" } elseif ($Quick) { "quick" } else { "full" }
+Write-Output "forge_smoke_mode=$smokeMode"
+
+$timer = Start-SmokeStep -Name "adapter_kernel_smoke"
 $adapterSmokePath = Join-Path $RepoRootForScripts "examples\flow-kit-project"
 $trellisSmokePath = Join-Path $RepoRootForScripts "examples\trellis-project"
 $taskKernelSmokePath = Join-Path $RepoRootForScripts "examples\task-kernel-project"
 $taskKernelWritableSmokePath = Join-Path $env:TEMP ("forge-task-kernel-smoke-" + [guid]::NewGuid().ToString("N"))
 Copy-Item -Recurse -LiteralPath $taskKernelSmokePath -Destination $taskKernelWritableSmokePath
-$adapterKernelSmokeTotal = 11
+$adapterKernelSmokeTotal = if ($Minimal) { 3 } else { 11 }
 $adapterKernelSmokePassed = 0
+$externalRefCompareSkipped = 0
 try {
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeExternalAdapter.ps1") -Name flow-kit -RepoPath $adapterSmokePath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "flow-kit adapter smoke failed" }
     $adapterKernelSmokePassed++
-    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeExternalAdapter.ps1") -Name trellis -RepoPath $trellisSmokePath | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "trellis adapter smoke failed" }
-    $adapterKernelSmokePassed++
+    if (-not $Minimal) {
+        & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeExternalAdapter.ps1") -Name trellis -RepoPath $trellisSmokePath | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "trellis adapter smoke failed" }
+        $adapterKernelSmokePassed++
+    }
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Test-ForgeTaskKernel.ps1") -RepoPath $taskKernelSmokePath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "task kernel smoke failed" }
     $adapterKernelSmokePassed++
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Resolve-ForgeStage.ps1") -RepoPath $taskKernelSmokePath -SessionId example | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "stage engine smoke failed" }
     $adapterKernelSmokePassed++
+    if (-not $Minimal) {
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Update-ForgeTaskContext.ps1") -RepoPath $taskKernelSmokePath -TaskPath ".forge\tasks\05-07-example-task" -Target list | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "task context smoke failed" }
     $adapterKernelSmokePassed++
     & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Add-ForgeSpecFinding.ps1") -RepoPath $taskKernelWritableSmokePath -Category guides -Title "Smoke Finding" -Summary "Smoke finding validates spec promotion." -Source "smoke" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "spec finding smoke failed" }
     $adapterKernelSmokePassed++
-    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Compare-ForgeExternalAdapterRef.ps1") -Name flow-kit -TargetRef "HEAD" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "external ref compare smoke failed" }
+    }
+    if ($NoExternalRefCompare -or $Minimal) {
+        $externalRefCompareSkipped = 1
+        Write-SmokeProgress -Message "skip external_ref_compare reason=disabled"
+    } else {
+    $externalRefOutput = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Compare-ForgeExternalAdapterRef.ps1") -Name flow-kit -TargetRef "HEAD" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $externalRefText = @($externalRefOutput) -join "`n"
+        if ($externalRefText -match '(?i)unable to access|ssl/tls|timed out|could not resolve|network|handshake') {
+            $externalRefCompareSkipped = 1
+            Write-SmokeProgress -Message "skip external_ref_compare reason=network_unavailable"
+        } else {
+            throw "external ref compare smoke failed"
+        }
+    }
     $adapterKernelSmokePassed++
+    }
+    if (-not $Minimal) {
     $createdTaskJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "New-ForgeTask.ps1") -RepoPath $taskKernelWritableSmokePath -Name "Smoke Task" -Title "Smoke Task" -Goal "Validate task command chaining." -Json
     if ($LASTEXITCODE -ne 0) { throw "new task smoke failed" }
     $createdTask = $createdTaskJson | ConvertFrom-Json
@@ -320,12 +383,16 @@ try {
     $smokeHistoryContent = Get-ChildItem -LiteralPath $smokeHistoryDir -Filter "*-smoke-finding-*.md" | Select-Object -First 1 | Get-Content -Raw -Encoding UTF8
     if ($smokeHistoryContent -notmatch "Smoke finding validates spec promotion.") { throw "spec finding history content smoke failed" }
     $adapterKernelSmokePassed++
+    }
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $taskKernelWritableSmokePath -ErrorAction SilentlyContinue
 }
+$adapterKernelSmokeOk = (($adapterKernelSmokeTotal - $adapterKernelSmokePassed) -eq 0)
+Complete-SmokeStep -Name "adapter_kernel_smoke" -Ok $adapterKernelSmokeOk -Timer $timer
 Write-Output "adapter_kernel_smoke_total=$adapterKernelSmokeTotal"
 Write-Output "adapter_kernel_smoke_passed=$adapterKernelSmokePassed"
 Write-Output "adapter_kernel_smoke_failed=$($adapterKernelSmokeTotal - $adapterKernelSmokePassed)"
+Write-Output "external_ref_compare_skipped=$externalRefCompareSkipped"
 
 Write-Output "forge_smoke_total=$($cases.Count)"
 Write-Output "forge_smoke_passed=$passed"
@@ -335,7 +402,11 @@ Write-Output "execution_router_passed=$executionPassed"
 Write-Output "execution_router_failed=$executionFailed"
 if ($executionFailed -gt 0) { exit 1 }
 
+if ($Minimal) {
+    Write-SkippedGate -Name "drift_gate" -Prefix "drift_gate"
+} else {
 # Drift gate evals: verify guided-full anti-drift guard catches known protocol violations.
+$timer = Start-SmokeStep -Name "drift_gate"
 $driftCases = @()
 if ($raw.ContainsKey("drift_gate_evals")) { $driftCases = @($raw.drift_gate_evals) }
 $driftPassed = 0
@@ -411,9 +482,13 @@ if ($driftCases.Count -gt 0) {
 Write-Output "drift_gate_total=$($driftCases.Count)"
 Write-Output "drift_gate_passed=$driftPassed"
 Write-Output "drift_gate_failed=$driftFailed"
+Complete-SmokeStep -Name "drift_gate" -Ok ($driftFailed -eq 0) -Timer $timer
 if ($driftFailed -gt 0) { exit 1 }
+}
 
 # PreToolUse and Stop audit hook evals: verify runtime hooks enforce M1 discipline.
+if (-not $Quick -and -not $Minimal) {
+$timer = Start-SmokeStep -Name "hook_gate"
 $hookTotal = 7
 $hookPassed = 0
 $hookFailed = 0
@@ -510,9 +585,15 @@ if ($LASTEXITCODE -ne 0) { $hookPassed++ } else { $hookFailed++ }
 Write-Output "hook_gate_total=$hookTotal"
 Write-Output "hook_gate_passed=$hookPassed"
 Write-Output "hook_gate_failed=$hookFailed"
+Complete-SmokeStep -Name "hook_gate" -Ok ($hookFailed -eq 0) -Timer $timer
 if ($hookFailed -gt 0) { exit 1 }
+} else {
+    Write-SkippedGate -Name "hook_gate" -Prefix "hook_gate"
+}
 
 # M1 compliance evals: verify implementation-phase routing discipline.
+if (-not $Quick -and -not $Minimal) {
+$timer = Start-SmokeStep -Name "m1_gate"
 $m1Total = 5
 $m1Passed = 0
 $m1Failed = 0
@@ -559,8 +640,14 @@ if ($LASTEXITCODE -eq 0) { $m1Passed++ } else { $m1Failed++ }
 Write-Output "m1_gate_total=$m1Total"
 Write-Output "m1_gate_passed=$m1Passed"
 Write-Output "m1_gate_failed=$m1Failed"
+Complete-SmokeStep -Name "m1_gate" -Ok ($m1Failed -eq 0) -Timer $timer
 if ($m1Failed -gt 0) { exit 1 }
+} else {
+    Write-SkippedGate -Name "m1_gate" -Prefix "m1_gate"
+}
 # High-risk discipline evals: high-risk M1 cannot skip TodoWrite/TDD/tests.
+if (-not $Quick -and -not $Minimal) {
+$highriskTimer = Start-SmokeStep -Name "highrisk_gate"
 $hrTotal = 3
 $hrPassed = 0
 $hrFailed = 0
@@ -625,8 +712,21 @@ Write-Output "l4_downgrade_gate_total=$l4DowngradeTotal"
 Write-Output "l4_downgrade_gate_passed=$l4DowngradePassed"
 Write-Output "l4_downgrade_gate_failed=$l4DowngradeFailed"
 if ($l4DowngradeFailed -gt 0) { exit 1 }
+Write-Output "highrisk_gate_total=$hrTotal"
+Write-Output "highrisk_gate_passed=$hrPassed"
+Write-Output "highrisk_gate_failed=$hrFailed"
+Complete-SmokeStep -Name "highrisk_gate" -Ok ($hrFailed -eq 0) -Timer $highriskTimer
+if ($hrFailed -gt 0) { exit 1 }
+} else {
+    $hrTotal = 0
+    $hrPassed = 0
+    $hrFailed = 0
+    Write-SkippedGate -Name "highrisk_gate" -Prefix "highrisk_gate"
+    Write-SkippedGate -Name "l4_downgrade_gate" -Prefix "l4_downgrade_gate"
+}
 
 # External adapter contract smoke: upstream frameworks must stay isolated behind Forge adapters.
+$timer = Start-SmokeStep -Name "adapter_contract"
 $adapterJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeAdapterCompatibility.ps1') -RepoPath (Get-Location).Path -Json
 $adapterExit = $LASTEXITCODE
 try { $adapter = $adapterJson | ConvertFrom-Json -AsHashtable } catch { $adapter = @{ ok = $false; issues = @("invalid_adapter_output") } }
@@ -635,12 +735,14 @@ $adapterFailed = if ($adapterPassed -eq 1) { 0 } else { 1 }
 Write-Output "adapter_contract_total=1"
 Write-Output "adapter_contract_passed=$adapterPassed"
 Write-Output "adapter_contract_failed=$adapterFailed"
+Complete-SmokeStep -Name "adapter_contract" -Ok ($adapterFailed -eq 0) -Timer $timer
 if ($adapterFailed -gt 0) {
     $adapter | ConvertTo-Json -Depth 8
     exit 1
 }
 
 # Forge docs health smoke: command/skill/docs boundaries must not drift.
+$timer = Start-SmokeStep -Name "docs_health"
 $docsHealthJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1') -ClaudeRoot (Get-Location).Path -Json
 $docsHealthExit = $LASTEXITCODE
 try { $docsHealth = $docsHealthJson | ConvertFrom-Json -AsHashtable } catch { $docsHealth = @{ ok = $false; issues = @("invalid_docs_health_output") } }
@@ -649,6 +751,7 @@ $docsHealthFailed = if ($docsHealthPassed -eq 1) { 0 } else { 1 }
 Write-Output "docs_health_total=1"
 Write-Output "docs_health_passed=$docsHealthPassed"
 Write-Output "docs_health_failed=$docsHealthFailed"
+Complete-SmokeStep -Name "docs_health" -Ok ($docsHealthFailed -eq 0) -Timer $timer
 if ($docsHealthFailed -gt 0) {
     $docsHealth | ConvertTo-Json -Depth 8
     exit 1
@@ -656,11 +759,13 @@ if ($docsHealthFailed -gt 0) {
 
 # Release readiness is a separate CI layer. Keep it optional here so smoke can
 # validate runtime behavior without recursively invoking aggregate gates.
+$timer = Start-SmokeStep -Name "release_readiness"
 if ($SkipReleaseReadiness) {
     Write-Output "release_readiness_total=0"
     Write-Output "release_readiness_passed=0"
     Write-Output "release_readiness_failed=0"
     Write-Output "release_readiness_skipped=1"
+    Complete-SmokeStep -Name "release_readiness" -Ok $true -Timer $timer
 } else {
     $readinessJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'Test-ForgeReleaseReadiness.ps1') -RepoPath (Get-Location).Path -SkipSmoke -Json
     $readinessExit = $LASTEXITCODE
@@ -670,16 +775,12 @@ if ($SkipReleaseReadiness) {
     Write-Output "release_readiness_total=1"
     Write-Output "release_readiness_passed=$readinessPassed"
     Write-Output "release_readiness_failed=$readinessFailed"
+    Complete-SmokeStep -Name "release_readiness" -Ok ($readinessFailed -eq 0) -Timer $timer
     if ($readinessFailed -gt 0) {
         $readiness | ConvertTo-Json -Depth 8
         exit 1
     }
 }
-
-Write-Output "highrisk_gate_total=$hrTotal"
-Write-Output "highrisk_gate_passed=$hrPassed"
-Write-Output "highrisk_gate_failed=$hrFailed"
-if ($hrFailed -gt 0) { exit 1 }
 
 if ($failed -gt 0) {
     $results | Where-Object { -not $_.passed } | ConvertTo-Json -Depth 6

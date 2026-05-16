@@ -96,7 +96,26 @@ if ($candidates.Count -lt 1) {
 $sourceCommit = ""
 try { $sourceCommit = (& git -C $ForgeRoot rev-parse --short HEAD 2>$null).Trim() } catch {}
 $globalScript = Join-Path $ClaudeRoot "scripts\forge.ps1"
-$globalScriptOk = ((Get-Sha256OrNull (Join-Path $ScriptDir "forge.ps1")) -eq (Get-Sha256OrNull $globalScript))
+$globalInstallRoots = @(
+    @{ source = Join-Path $ForgeRoot "commands"; destination = Join-Path $ClaudeRoot "commands" },
+    @{ source = Join-Path $ForgeRoot "skills"; destination = Join-Path $ClaudeRoot "skills" },
+    @{ source = Join-Path $ForgeRoot "docs"; destination = Join-Path $ClaudeRoot "docs" },
+    @{ source = Join-Path $ForgeRoot "scripts"; destination = Join-Path $ClaudeRoot "scripts" }
+)
+
+function Test-InstallTreeMatches {
+    foreach ($root in @($globalInstallRoots)) {
+        if (-not (Test-Path -LiteralPath $root.source) -or -not (Test-Path -LiteralPath $root.destination)) { return $false }
+        foreach ($sourceFile in Get-ChildItem -LiteralPath $root.source -File -Recurse -Force) {
+            $relative = [System.IO.Path]::GetRelativePath($root.source, $sourceFile.FullName)
+            $destinationFile = Join-Path $root.destination $relative
+            if ((Get-Sha256OrNull $sourceFile.FullName) -ne (Get-Sha256OrNull $destinationFile)) { return $false }
+        }
+    }
+    return $true
+}
+
+$globalScriptOk = Test-InstallTreeMatches
 
 $results = @()
 foreach ($repo in @($candidates)) {
@@ -118,6 +137,7 @@ foreach ($repo in @($candidates)) {
     if ($Apply -and $needsSync) {
         $installOutput = @(& pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $InstallScript -RepoPath $repo -ClaudeRoot $ClaudeRoot -BinDir $BinDir 2>&1)
         $installExit = $LASTEXITCODE
+        $globalScriptOk = Test-InstallTreeMatches
         $hookResults = @()
         foreach ($name in $HookNames) {
             $src = Join-Path $ForgeRoot ("hooks\" + $name)
@@ -140,7 +160,7 @@ foreach ($repo in @($candidates)) {
     }
 }
 
-$afterGlobalOk = ((Get-Sha256OrNull (Join-Path $ScriptDir "forge.ps1")) -eq (Get-Sha256OrNull $globalScript))
+$afterGlobalOk = Test-InstallTreeMatches
 $remaining = @($results | Where-Object { [bool]$_.needs_sync })
 $result = [ordered]@{
     ok = ($remaining.Count -eq 0 -and $afterGlobalOk)

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Quick','Offline','Live','Full')][string]$Mode = 'Offline',
+    [ValidateSet('Lite','Quick','Offline','Live','Full')][string]$Mode = 'Offline',
     [string]$RepoPath = ".",
     [int]$LiveMaxAgeHours = 24,
     [string]$LiveRouteLogPath = "$env:USERPROFILE\.claude\logs\forge-smoke.jsonl",
@@ -116,7 +116,14 @@ if(-not (Test-Path -LiteralPath $statePath)){ $statePath = Join-Path $repoClaude
 $guardPath = Join-Path $repoClaude 'hooks\forge-pretool-guard.ps1'
 $auditPath = Join-Path $repoClaude 'hooks\forge-session-audit.ps1'
 
-if($Mode -eq 'Quick'){
+if($Mode -eq 'Lite'){
+    Add-InlineCheck 'settings_json' { Test-JsonFile $settingsPath }
+    Add-InlineCheck 'session_state_json' { Test-JsonFile $statePath }
+    Add-InlineCheck 'pretool_guard_exists' { if(-not (Test-Path -LiteralPath $guardPath)){ throw "missing: $guardPath" }; "ok: $guardPath" }
+    Add-InlineCheck 'session_audit_exists' { if(-not (Test-Path -LiteralPath $auditPath)){ throw "missing: $auditPath" }; "ok: $auditPath" }
+    Add-ProcessCheck 'm1_open_groups' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeM1Compliance.ps1'),'-RepoPath',$RepoPath,'-AllOpenGroups','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+} elseif($Mode -eq 'Quick'){
     Add-InlineCheck 'settings_json' { Test-JsonFile $settingsPath }
     Add-InlineCheck 'session_state_json' { Test-JsonFile $statePath }
     Add-InlineCheck 'pretool_guard_exists' { if(-not (Test-Path -LiteralPath $guardPath)){ throw "missing: $guardPath" }; "ok: $guardPath" }
@@ -125,6 +132,7 @@ if($Mode -eq 'Quick'){
     Add-ProcessCheck 'task_kernel_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeTaskKernel.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_adapters_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeExternalAdapter.ps1'),'-Name','all','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'workflow_entrypoints' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkflowEntrypoints.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
 } else {
@@ -133,6 +141,7 @@ if($Mode -eq 'Quick'){
     Add-ProcessCheck 'task_kernel_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeTaskKernel.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_adapters_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeExternalAdapter.ps1'),'-Name','all','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
+    Add-ProcessCheck 'workflow_entrypoints' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkflowEntrypoints.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     $runtimeChecksRequired = ($Mode -eq 'Live' -or $Mode -eq 'Full')

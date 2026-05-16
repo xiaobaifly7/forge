@@ -4,6 +4,7 @@ param(
     [string]$PrNumber = "",
     [switch]$AllowMissingPrChecks,
     [switch]$SkipSmoke,
+    [switch]$Full,
     [switch]$Json
 )
 
@@ -11,6 +12,34 @@ $ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $PSCommandPath
 $RepoRoot = (Resolve-Path -LiteralPath $RepoPath).Path
 $checks = @()
+$ProgressEnabled = -not $Json
+
+function Write-ReadinessProgress {
+    param([string]$Message)
+    if ($script:ProgressEnabled) {
+        [Console]::Out.WriteLine("[verify] $Message")
+    }
+}
+
+function Start-ReadinessStep {
+    param([string]$Name)
+    Write-ReadinessProgress -Message "start $Name"
+    return [System.Diagnostics.Stopwatch]::StartNew()
+}
+
+function Complete-ReadinessStep {
+    param(
+        [string]$Name,
+        [bool]$Ok,
+        [string]$Severity = "error",
+        [System.Diagnostics.Stopwatch]$Timer
+    )
+    if ($Timer) { $Timer.Stop() }
+    $durationMs = if ($Timer) { $Timer.ElapsedMilliseconds } else { 0 }
+    $label = if ($Ok) { "pass" } elseif ($Severity -eq "warning") { "warn" } else { "fail" }
+    Write-ReadinessProgress -Message "$label $Name duration_ms=$durationMs"
+    return $durationMs
+}
 
 function Add-ReadinessCheck {
     param(
@@ -18,7 +47,8 @@ function Add-ReadinessCheck {
         [bool]$Ok,
         [string]$Severity = "error",
         [string]$Summary = "",
-        [object]$Details = $null
+        [object]$Details = $null,
+        [long]$DurationMs = -1
     )
     $script:checks += [ordered]@{
         name = $Name
@@ -26,6 +56,7 @@ function Add-ReadinessCheck {
         severity = if ($Ok) { "pass" } else { $Severity }
         summary = $Summary
         details = $Details
+        duration_ms = $(if ($DurationMs -ge 0) { $DurationMs } else { $null })
     }
 }
 
@@ -79,34 +110,65 @@ function Get-ReadinessFixHint {
 
 $manifests = @("flow-kit", "trellis")
 foreach ($name in $manifests) {
+    $checkName = "adapter_${name}_baseline"
+    $timer = Start-ReadinessStep -Name $checkName
     $manifestPath = Join-Path $RepoRoot ("adapters\external\" + $name + ".yaml")
     $content = if (Test-Path -LiteralPath $manifestPath) { Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 } else { "" }
     $baselineOk = ($content -match '(?m)^pinned_ref:\s*[0-9a-f]{40}\s*$') -and
         ($content -match '(?m)^last_audited_ref:\s*[0-9a-f]{40}\s*$') -and
         ($content -notmatch 'manual-audit-required')
-    Add-ReadinessCheck -Name "adapter_${name}_baseline" -Ok $baselineOk -Summary $manifestPath
+    $durationMs = Complete-ReadinessStep -Name $checkName -Ok $baselineOk -Timer $timer
+    Add-ReadinessCheck -Name $checkName -Ok $baselineOk -Summary $manifestPath -DurationMs $durationMs
 }
 
-$health = Invoke-ProcessJson -Arguments @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "Invoke-ForgeHealth.ps1"), "-Mode", "Quick", "-RepoPath", $RepoRoot, "-Json") -TimeoutSeconds 90
+$timer = Start-ReadinessStep -Name "quick_health"
+$healthMode = if ($Full) { "Quick" } else { "Lite" }
+$health = Invoke-ProcessJson -Arguments @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "Invoke-ForgeHealth.ps1"), "-Mode", $healthMode, "-RepoPath", $RepoRoot, "-Json") -TimeoutSeconds 90
 $healthOk = ($health.exit_code -eq 0 -and $health.json -and [bool]$health.json.ok)
 $warningCount = if ($health.json -and $health.json.ContainsKey("warnings")) { @($health.json.warnings).Count } else { 0 }
-Add-ReadinessCheck -Name "quick_health" -Ok $healthOk -Summary "warnings=$warningCount" -Details $health.json
+$durationMs = Complete-ReadinessStep -Name "quick_health" -Ok $healthOk -Timer $timer
+Add-ReadinessCheck -Name "quick_health" -Ok $healthOk -Summary "mode=$healthMode warnings=$warningCount" -Details $health.json -DurationMs $durationMs
 
 if (-not $SkipSmoke) {
-    $smoke = Invoke-ProcessJson -Arguments @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "forge-smoke.ps1"), "-NoLog", "-SkipReleaseReadiness") -TimeoutSeconds 120
-    Add-ReadinessCheck -Name "smoke" -Ok ($smoke.exit_code -eq 0) -Summary (($smoke.output -split "`r?`n" | Where-Object { $_ -match '_failed=0$|_passed=' } | Select-Object -Last 8) -join "; ") -Details $smoke.output
+    $timer = Start-ReadinessStep -Name "smoke"
+    $smokeArgs = @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $ScriptDir "forge-smoke.ps1"), "-NoLog", "-SkipReleaseReadiness")
+    if (-not $Full) { $smokeArgs += @("-Quick", "-Minimal", "-NoExternalRefCompare") }
+    $smoke = Invoke-ProcessJson -Arguments $smokeArgs -TimeoutSeconds 120
+    $smokeOk = ($smoke.exit_code -eq 0)
+    $durationMs = Complete-ReadinessStep -Name "smoke" -Ok $smokeOk -Timer $timer
+    $smokeSummaryLines = @(
+        $smoke.output -split "`r?`n" | Where-Object {
+            $_ -match '^forge_smoke_mode=' -or
+            $_ -match '^(adapter_kernel_smoke|hook_gate|m1_gate|highrisk_gate|l4_downgrade_gate|adapter_contract|docs_health|release_readiness)_(passed|failed|skipped)='
+        }
+    )
+    Add-ReadinessCheck -Name "smoke" -Ok $smokeOk -Summary (($smokeSummaryLines | Select-Object -First 16) -join "; ") -Details $smoke.output -DurationMs $durationMs
 } else {
-    Add-ReadinessCheck -Name "smoke" -Ok $true -Severity "warning" -Summary "skipped"
+    Write-ReadinessProgress -Message "skip smoke"
+    Add-ReadinessCheck -Name "smoke" -Ok $true -Severity "warning" -Summary "skipped" -DurationMs 0
 }
 
+$timer = Start-ReadinessStep -Name "diff_check"
 $diffCheck = Invoke-Git -Arguments @("diff", "--check")
 $diffSummary = if ($diffCheck.exit_code -eq 0) { "" } else { $diffCheck.output }
-Add-ReadinessCheck -Name "diff_check" -Ok ($diffCheck.exit_code -eq 0) -Summary $diffSummary -Details $diffCheck.output
+$diffOk = ($diffCheck.exit_code -eq 0)
+$durationMs = Complete-ReadinessStep -Name "diff_check" -Ok $diffOk -Timer $timer
+Add-ReadinessCheck -Name "diff_check" -Ok $diffOk -Summary $diffSummary -Details $diffCheck.output -DurationMs $durationMs
 
+$timer = Start-ReadinessStep -Name "worktree_status"
 $status = Invoke-Git -Arguments @("status", "--porcelain=v1")
-Add-ReadinessCheck -Name "worktree_status" -Ok ($status.exit_code -eq 0 -and [string]::IsNullOrWhiteSpace($status.output)) -Severity "warning" -Summary $status.output -Details $status.output
+$statusOk = ($status.exit_code -eq 0 -and [string]::IsNullOrWhiteSpace($status.output))
+$durationMs = Complete-ReadinessStep -Name "worktree_status" -Ok $statusOk -Severity "warning" -Timer $timer
+$statusSummary = ""
+if (-not $statusOk) {
+    $changedFiles = @($status.output -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Substring([Math]::Min(3, $_.Length)).Trim() } | Select-Object -First 8)
+    $statusSummary = "uncommitted changes in forge source repo"
+    if ($changedFiles.Count -gt 0) { $statusSummary += ": " + ($changedFiles -join ", ") }
+}
+Add-ReadinessCheck -Name "worktree_status" -Ok $statusOk -Severity "warning" -Summary $statusSummary -Details $status.output -DurationMs $durationMs
 
 if (-not [string]::IsNullOrWhiteSpace($PrNumber)) {
+    $timer = Start-ReadinessStep -Name "pr_checks_present"
     $prOutput = & gh pr view $PrNumber --json number,state,isDraft,mergeStateStatus,statusCheckRollup,reviewDecision 2>&1
     $prExit = $LASTEXITCODE
     $pr = $null
@@ -114,9 +176,12 @@ if (-not [string]::IsNullOrWhiteSpace($PrNumber)) {
     $checksCount = if ($pr -and $pr.ContainsKey("statusCheckRollup")) { @($pr.statusCheckRollup).Count } else { 0 }
     $checksOk = $prExit -eq 0 -and $pr -and ($checksCount -gt 0 -or $AllowMissingPrChecks)
     $checksSummary = if ($AllowMissingPrChecks -and $checksCount -eq 0) { "status_checks=0 allow_missing=true" } else { "status_checks=$checksCount" }
-    Add-ReadinessCheck -Name "pr_checks_present" -Ok $checksOk -Severity "warning" -Summary $checksSummary -Details $pr
+    $durationMs = Complete-ReadinessStep -Name "pr_checks_present" -Ok $checksOk -Severity "warning" -Timer $timer
+    Add-ReadinessCheck -Name "pr_checks_present" -Ok $checksOk -Severity "warning" -Summary $checksSummary -Details $pr -DurationMs $durationMs
+    $timer = Start-ReadinessStep -Name "pr_merge_state"
     $prClean = $prExit -eq 0 -and $pr -and [string]$pr.state -eq "OPEN" -and [string]$pr.mergeStateStatus -eq "CLEAN"
-    Add-ReadinessCheck -Name "pr_merge_state" -Ok $prClean -Summary "state=$($pr.state) merge=$($pr.mergeStateStatus)" -Details $pr
+    $durationMs = Complete-ReadinessStep -Name "pr_merge_state" -Ok $prClean -Timer $timer
+    Add-ReadinessCheck -Name "pr_merge_state" -Ok $prClean -Summary "state=$($pr.state) merge=$($pr.mergeStateStatus)" -Details $pr -DurationMs $durationMs
 }
 
 $errors = @($checks | Where-Object { -not $_.ok -and $_.severity -eq "error" })

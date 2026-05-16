@@ -22,6 +22,7 @@ Most daily use should fit three commands:
 
 ```powershell
 forge doctor
+forge workflows
 forge task new -Title "Describe the task"
 forge verify
 ```
@@ -29,10 +30,15 @@ forge verify
 Use them as:
 
 1. **doctor**: check whether Forge can safely run in this repo.
-2. **task new**: create a tracked task artifact before agent work.
-3. **verify**: produce a release-readiness verdict before PR or merge.
+2. **workflows**: show whether BMAD, Superpowers, gstack, Compound Engineering, and GSD are active, staged, vendor-only, or missing.
+3. **task new**: create a tracked task artifact before agent work.
+4. **verify**: produce a fast local release-readiness verdict before PR or merge.
 
 Forge keeps deeper adapter, baseline, and smoke details behind those commands. If a check fails, the verdict should name the failing layer and the next fix command.
+
+`forge verify` defaults to a local `Lite` health check plus minimal smoke so it stays fast and does not depend on upstream network access. Use `forge verify -Full` before final release, `forge smoke -Quick` for extended local smoke, and `forge version -FixDrift` to refresh a source-linked install when `forge_source_drift=true`.
+
+Forge treats workflow kits as routed capabilities, not always-on prompt bulk. BMAD is the planning source, Superpowers is the execution discipline layer, gstack is a manual gate, and Compound Engineering/GSD stay manual-approval unless explicitly enabled for learnings or state handoff.
 
 ## Repository Layout
 
@@ -66,7 +72,7 @@ forge doctor -RepoPath "<repo>"
 For deeper validation:
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Offline -RepoPath "<repo>"
+forge verify -RepoPath "<repo>" -Full
 ```
 
 ## Contributing And Releases

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -13,6 +13,9 @@ param(
     [string]$PrNumber = "",
     [switch]$Json,
     [switch]$SkipSmoke,
+    [switch]$Full,
+    [switch]$Quick,
+    [switch]$FixDrift,
     [switch]$Apply,
     [string]$RegistryPath = "",
     [string[]]$SearchRoot = @(),
@@ -30,11 +33,12 @@ function Show-ForgeHelp {
     Write-Output "Usage:"
     Write-Output "  forge doctor [-RepoPath .] [-Json]"
     Write-Output "  forge task new -Title `"Fix bug`" [-Name task-slug] [-RepoPath .] [-Json]"
-    Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Json]"
-    Write-Output "  forge smoke [-RepoPath .]"
+    Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Full] [-Json]"
+    Write-Output "  forge smoke [-RepoPath .] [-Quick]"
     Write-Output "  forge install -RepoPath <repo>"
     Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
-    Write-Output "  forge version"
+    Write-Output "  forge workflows [-RepoPath .] [-Json]"
+    Write-Output "  forge version [-FixDrift]"
 }
 
 function Invoke-ForgeScript {
@@ -78,11 +82,14 @@ switch ($Command) {
         $args = @("-RepoPath", $RepoPath)
         if (-not [string]::IsNullOrWhiteSpace($PrNumber)) { $args += @("-PrNumber", $PrNumber) }
         if ($SkipSmoke) { $args += "-SkipSmoke" }
+        if ($Full) { $args += "-Full" }
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Test-ForgeReleaseReadiness.ps1" -Arguments $args
     }
     "smoke" {
-        Invoke-ForgeScript -Name "forge-smoke.ps1" -Arguments @("-NoLog", "-SkipReleaseReadiness")
+        $args = @("-NoLog", "-SkipReleaseReadiness")
+        if ($Quick) { $args += "-Quick" }
+        Invoke-ForgeScript -Name "forge-smoke.ps1" -Arguments $args
     }
     "install" {
         Invoke-ForgeScript -Name "Install-ForgeLocal.ps1" -Arguments @("-RepoPath", $RepoPath)
@@ -104,10 +111,16 @@ switch ($Command) {
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Manage-ForgeProjects.ps1" -Arguments $args
     }
+    "workflows" {
+        $args = @("-RepoPath", $RepoPath)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Test-ForgeWorkflowEntrypoints.ps1" -Arguments $args
+    }
     "version" {
         Write-Output "forge_repo=$RepoRoot"
         Write-Output "forge_installed_script=$PSCommandPath"
         $versionPath = Join-Path $RepoRoot "version.json"
+        $sourceInfo = @{}
         if (-not (Test-Path -LiteralPath $versionPath)) {
             $sourcePathForVersion = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
             if (Test-Path -LiteralPath $sourcePathForVersion) {
@@ -132,7 +145,40 @@ switch ($Command) {
         } catch {}
         $sourcePath = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
         if (Test-Path -LiteralPath $sourcePath) {
-            Get-Content -LiteralPath $sourcePath -Encoding UTF8
+            foreach ($line in Get-Content -LiteralPath $sourcePath -Encoding UTF8) {
+                Write-Output $line
+                if ($line -match '^([^=]+)=(.*)$') {
+                    $sourceInfo[$Matches[1]] = $Matches[2]
+                }
+            }
+        }
+        if ($sourceInfo.ContainsKey("forge_source_repo")) {
+            $sourceRepo = $sourceInfo["forge_source_repo"]
+            try {
+                $sourceHead = & git -C $sourceRepo rev-parse --short HEAD 2>$null
+                if ($LASTEXITCODE -eq 0 -and $sourceHead) {
+                    Write-Output "forge_source_current_commit=$sourceHead"
+                    if ($sourceInfo.ContainsKey("forge_source_commit")) {
+                        $drift = ([string]$sourceInfo["forge_source_commit"] -ne [string]$sourceHead)
+                        Write-Output "forge_source_drift=$($drift.ToString().ToLowerInvariant())"
+                        if ($drift) {
+                            Write-Output "forge_source_drift_hint=run forge install -RepoPath `"$sourceRepo`""
+                            if ($FixDrift) {
+                                $installScript = Join-Path $sourceRepo "scripts\Install-ForgeLocal.ps1"
+                                if (Test-Path -LiteralPath $installScript) {
+                                    Write-Output "forge_source_drift_fix=installing"
+                                    & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $installScript -RepoPath $sourceRepo
+                                    exit $LASTEXITCODE
+                                } else {
+                                    Write-Output "forge_source_drift_fix=missing_install_script"
+                                }
+                            }
+                        } elseif ($FixDrift) {
+                            Write-Output "forge_source_drift_fix=not_needed"
+                        }
+                    }
+                }
+            } catch {}
         }
     }
     default {
