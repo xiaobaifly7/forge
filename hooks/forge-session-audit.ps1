@@ -125,6 +125,13 @@ try {
     $driftPath = Join-Path $claudeDir 'forge-drift-audit.jsonl'
     $statePath = Join-Path $claudeDir 'forge-session-state.json'
     $routingPath = Join-Path $claudeDir 'forge-routing.jsonl'
+
+    # repo 既无 forge state 也无 routing 日志 → 非活跃 forge 会话，跳过 audit，规避 lastHintSessionId 跨项目 false positive
+    if (-not (Test-Path -LiteralPath $statePath) -and -not (Test-Path -LiteralPath $routingPath)) {
+        Write-HookMetrics -Hook $hookName -Event $Event -Tool '' -Verdict 'skip-no-forge-state' -DurationMs ((Get-Date) - $hookStart).TotalMilliseconds -Extra @{ repo_root=$repoRoot; issue_count=0 }
+        exit 0
+    }
+
     $issues = [System.Collections.Generic.List[string]]::new()
 
     # ── #5 全局脚本路径（不再硬编码用户名） ────────────────
