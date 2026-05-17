@@ -1,0 +1,44 @@
+{
+  "name": "forge",
+  "profile_version": 3,
+  "role": "forge-core-repository",
+  "governance": "authoritative",
+  "default_min_mode": "build",
+  "default_route_level": "L2",
+  "default_full_execution": "guided-full",
+  "full_auto_requires_explicit_user_request": true,
+  "forge_adoption": {
+    "mode": "full",
+    "reason": "forge source repo: authoritative workflow control plane"
+  },
+  "active_update_policy": {
+    "gstack": "manual_approval",
+    "compound": "manual_approval",
+    "gsd2": "manual_approval",
+    "bmad": "staging_first",
+    "superpowers": "marketplace_managed"
+  },
+  "route_levels": {
+    "L0": "read_only_direct_no_state_write",
+    "L1": "direct_minimal_change_targeted_verify",
+    "L2": "superpowers_discipline_build_or_fix",
+    "L3": "bmad_superpowers_gstack_gsd",
+    "L4": "bmad_gsd2_superpowers_gstack_compound"
+  },
+  "module_boundaries": {
+    "forge": "thin_router_only",
+    "bmad": "planning_architecture_story_acceptance",
+    "superpowers": "execution_tdd_debug_verification",
+    "gstack": "gate_only",
+    "gsd2": "state_machine_for_L4",
+    "compound": "high_value_learnings_only"
+  },
+  "external_adapters": {
+    "flow-kit": "read_only_methodology_adapter",
+    "trellis": "read_only_task_spec_workspace_adapter"
+  },
+  "notes": [
+    "This repo-local profile satisfies Forge adapter compatibility checks.",
+    "It does not install external runtimes or take over global hooks."
+  ]
+}

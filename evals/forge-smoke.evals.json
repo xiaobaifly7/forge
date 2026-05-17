@@ -1,0 +1,211 @@
+{
+  "skill_name": "forge",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我把共享 SDK 的认证类型从 token_v1 升级到 token_v2，API 网关和前端都要一起改",
+      "expected_output": "命中 shared_contract + security_auth + cross-module，直接判定为 full，并给出 [FORGE] mode=full reason=shared_contract,security_auth,cross_module",
+      "files": [
+        "packages/sdk",
+        "gateway",
+        "web"
+      ],
+      "expected_execution": "guided-full"
+    },
+    {
+      "id": 2,
+      "prompt": "tests/api/test_orders.py 今天失败了，回归在订单取消逻辑，先帮我修掉",
+      "expected_output": "明确是 bug/test failure，优先判定为 fix；若项目画像风险高只允许升级到 full，不允许降档",
+      "files": [
+        "tests/api/test_orders.py"
+      ],
+      "expected_execution": "auto"
+    },
+    {
+      "id": 3,
+      "prompt": "给现有 CLI 增加一个 --json 输出选项，需求很清楚，就在当前命令模块里扩一下",
+      "expected_output": "需求清晰且在既有架构内，判定为 build，并进入轻规划 -> 按 best-path first 选择单代理或多代理实现 -> 定向验收主链",
+      "files": [
+        "src/commands"
+      ],
+      "expected_execution": "auto"
+    },
+    {
+      "id": 4,
+      "prompt": "这版准备发了，帮我做最后的验收、回归检查和交付收尾",
+      "expected_output": "明确是 release/handoff 意图，判定为 ship，并按 best-path first 处理验收与收尾：可拆分时并行，不可拆分时单代理进入最终 gate",
+      "files": [],
+      "expected_execution": "auto"
+    },
+    {
+      "id": 5,
+      "prompt": "我要做一个跨模块的新功能，但这个仓库还没有 _bmad，先按 full 帮我起好",
+      "expected_output": "判定为 full，并在进入协议前先要求执行 forge-bmad-init 或 install-bmad-local.ps1，为仓库生成本地 _bmad 与项目画像；full 默认按 guided-full 逐步工作流推进，阶段间等待用户确认，只有显式 full-auto 才连续执行",
+      "files": [],
+      "expected_execution": "guided-full"
+    },
+    {
+      "id": 6,
+      "prompt": "这个功能需求已经定了，不要单代理，直接用 subagent 帮我拆开做完",
+      "expected_output": "若边界清晰且在既有架构内，判定为 build；因用户显式要求并行，执行层优先选择 subagent-driven-development/等价多代理实现，而不是默认强制单代理",
+      "files": [],
+      "expected_execution": "auto"
+    },
+    {
+      "id": 7,
+      "prompt": "先只读看一下这个工作流合不合理，不要改文件",
+      "expected_output": "只读评估，判定为 quick/audit-only，并输出 [FORGE] level=L0 mode=quick reason=audit_only",
+      "files": [],
+      "expected_execution": "audit-only"
+    },
+    {
+      "id": 8,
+      "prompt": "这是一个多阶段长期项目，后面要持续推进和沉淀状态",
+      "expected_output": "长期多阶段状态连续性任务，判定为 full，并输出 [FORGE] level=L4 mode=full reason=stateful_long_running，叠加 GSD-2 与 compound",
+      "files": [],
+      "expected_execution": "guided-full"
+    },
+    {
+      "id": "exec-explicit-guided",
+      "prompt": "用 guide 模式带我一步一步做这个跨模块认证升级，每步等我确认",
+      "expected_output": "[forge] mode=full",
+      "expected_execution": "guided-full",
+      "files": []
+    },
+    {
+      "id": "exec-explicit-auto",
+      "prompt": "这个 bug 很明确，用 auto 模式直接修完，不用每步问我",
+      "expected_output": "[forge] mode=fix",
+      "expected_execution": "auto",
+      "files": []
+    },
+    {
+      "id": "exec-auto-clear-build",
+      "prompt": "需求已经定了，在现有模块加一个配置开关，帮我自动做完并验证",
+      "expected_output": "[forge] mode=build",
+      "expected_execution": "auto",
+      "files": []
+    },
+    {
+      "id": "exec-auto-guided-ambiguous",
+      "prompt": "我想重构认证和权限这块，但方案还不确定，先带我一步步梳理",
+      "expected_output": "[forge] mode=full",
+      "expected_execution": "guided-full",
+      "files": []
+    },
+    {
+      "id": "exec-explicit-full-auto",
+      "prompt": "用 full-auto 端到端自动推进这个多阶段交付，不要分阶段停顿",
+      "expected_output": "[forge] mode=full-auto",
+      "expected_execution": "full-auto",
+      "files": []
+    },
+    {
+      "id": "bmad-priority-miniapp-l4",
+      "prompt": "miniapp v4 视觉/交互重构，按方案一推进，要求每阶段确认",
+      "expected_output": "命中 L4/full+stateful，必须进入 BMAD planning: requirements -> architecture -> stories -> acceptance；Superpowers brainstorming 只能作为 BMAD requirements 辅助，不得替代 BMAD。输出 [FORGE] level=L4 mode=full execution=guided-full inherited_from=miniapp-v4-trust execution_scope=normal",
+      "files": [
+        "apps/miniapp",
+        "apps/miniapp/DESIGN.md",
+        "_bmad/v4-trust"
+      ],
+      "expected_execution": "guided-full"
+    },
+    {
+      "id": "l4-inheritance-wallet-picker",
+      "prompt": "钱包 picker 是 miniapp v4 视觉重构 milestone 的阶段 2.1 子任务，只是局部增强",
+      "expected_output": "继承父 milestone，不得降级。输出 [FORGE] level=L4 mode=full execution=guided-full inherited_from=miniapp-v4-trust execution_scope=light；可以降低 execution_scope，但不能把 level 降到 L3/L2。",
+      "files": [
+        "apps/miniapp",
+        "wallet-deeplinks.ts",
+        "_bmad/v4-trust"
+      ],
+      "expected_execution": "guided-full"
+    }
+  ],
+  "drift_gate_evals": [
+    {
+      "id": "guided-full-1a-multi-question-block",
+      "candidate": "我们先确认需求、技术栈、数据库和部署方式。你想用 React 还是 Vue？数据库 PostgreSQL 还是 SQLite？接下来我会进入架构设计。",
+      "expect_issues": [
+        "phase_1a_multi_question",
+        "phase_1a_rush_to_architecture",
+        "missing_pipeline_marker"
+      ]
+    },
+    {
+      "id": "guided-full-1a-complete-without-artifact-block",
+      "candidate": "[PIPELINE] 阶段 1A 完成 → 进入阶段 1B",
+      "expect_issues": [
+        "phase_1a_complete_without_artifact_path"
+      ]
+    },
+    {
+      "id": "guided-full-1a-good-complete-pass",
+      "candidate": "[PIPELINE] 阶段 1A 完成 → 等待确认\n已落盘：.claude/forge/artifacts/SMOKE-1A-brainstorm.md\n是否确认进入阶段 1B？",
+      "expect_issues": []
+    },
+    {
+      "id": "guided-full-1a-next-phase-without-confirm-block",
+      "candidate": "[PIPELINE] 阶段 1A 完成 → 进入阶段 1B 架构",
+      "expect_issues": [
+        "next_phase_without_user_confirmation"
+      ]
+    },
+    {
+      "id": "guided-full-1a-empty-artifact-block",
+      "candidate": "[PIPELINE] 阶段 1A 完成 → 等待确认",
+      "expect_issues": [
+        "phase_1a_artifact_empty"
+      ],
+      "setup": "empty_artifact"
+    },
+    {
+      "id": "guided-full-phase-mismatch-block",
+      "candidate": "[PIPELINE] 阶段 1B 完成 → 进入阶段 1C",
+      "expect_issues": [
+        "candidate_phase_mismatch_state"
+      ]
+    },
+    {
+      "id": "guided-full-expired-drill-state-block",
+      "candidate": "[PIPELINE] 阶段 1A 进行中 → 等待用户回答\n问题 1/1：目标用户是谁？",
+      "expect_issues": [
+        "drill_state_expired"
+      ],
+      "setup": "expired_drill_state"
+    }
+  ],
+  "live_route_evals": [
+    {
+      "id": "live-quick-readonly",
+      "prompt": "只读看一下这个项目有哪些优化点，不要改文件",
+      "expected_output": "[forge] mode=quick",
+      "expected_execution": "audit-only"
+    },
+    {
+      "id": "live-fix-test-failure",
+      "prompt": "tests/api/test_orders.py 失败了，帮我定位并修掉这个回归",
+      "expected_output": "[forge] mode=fix",
+      "expected_execution": "auto"
+    },
+    {
+      "id": "live-build-small-feature",
+      "prompt": "在现有 CLI 命令模块里新增一个 --json 输出参数；这是清晰的小功能，不是 bug 修复，也没有测试失败；需要修改代码并做定向验证",
+      "expected_output": "[forge] mode=build",
+      "expected_execution": "auto"
+    },
+    {
+      "id": "live-full-shared-auth",
+      "prompt": "把共享 SDK 的认证类型从 token_v1 升级到 token_v2，API 网关和前端都要一起改",
+      "expected_output": "[forge] mode=full",
+      "expected_execution": "guided-full"
+    },
+    {
+      "id": "live-ship-release-handoff",
+      "prompt": "准备发布这个版本，做最后的 release handoff 和交付前验收",
+      "expected_output": "[forge] mode=ship",
+      "expected_execution": "guided-full"
+    }
+  ]
+}

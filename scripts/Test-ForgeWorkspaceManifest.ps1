@@ -43,6 +43,8 @@ $relativePaths = @(
     (Join-Path $ScriptDir 'Reset-ForgeSessionState.ps1'),
     (Join-Path $ScriptDir 'Rotate-ForgeAuditLogs.ps1'),
     (Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),
+    (Join-Path $ScriptDir 'Test-ForgeWorkflowEntrypoints.ps1'),
+    (Join-Path $ScriptDir 'Export-GstackLocalPatches.ps1'),
     (Join-Path $ClaudeRoot 'skills\forge\evals\evals.json'),
     (Join-Path $ClaudeRoot 'docs\forge-protocols.md'),
     (Join-Path $ClaudeRoot 'docs\forge-schema-versions.md'),

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "mode": "repo_contract_stub",
+  "status": "inactive",
+  "notes": [
+    "Repo-local placeholder for Forge health checks.",
+    "Live sessions may write richer runtime state outside this stub."
+  ]
+}

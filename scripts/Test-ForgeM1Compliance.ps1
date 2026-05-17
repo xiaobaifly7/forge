@@ -212,7 +212,7 @@ if ($groups.Count -lt 1) {
         routing = $routingPath
         checked_groups = @()
         group_results = @()
-        issues = if ($okWhenEmpty) { @() } else { @($message) }
+        issues = @(if (-not $okWhenEmpty) { $message })
         note = $message
     }
 } else {

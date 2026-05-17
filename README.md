@@ -16,6 +16,30 @@ This repository is the extracted, public-friendly source layout for a local Forg
 - PowerShell health and smoke checks for docs, workspace manifest, M1 compliance, live route freshness, and session state.
 - Optional adapter points for external workflow tools such as Superpowers, GSD, Task Master, gstack, GitNexus, UI review, and lint tools.
 
+## Happy Path
+
+Most daily use should fit three commands:
+
+```powershell
+forge doctor
+forge workflows
+forge task new -Title "Describe the task"
+forge verify
+```
+
+Use them as:
+
+1. **doctor**: check whether Forge can safely run in this repo.
+2. **workflows**: show whether BMAD, Superpowers, gstack, Compound Engineering, and GSD are active, staged, vendor-only, or missing.
+3. **task new**: create a tracked task artifact before agent work.
+4. **verify**: produce a fast local release-readiness verdict before PR or merge.
+
+Forge keeps deeper adapter, baseline, and smoke details behind those commands. If a check fails, the verdict should name the failing layer and the next fix command.
+
+`forge verify` defaults to a local `Lite` health check plus minimal smoke so it stays fast and does not depend on upstream network access. Use `forge verify -Full` before final release, `forge smoke -Quick` for extended local smoke, and `forge version -FixDrift` to refresh a source-linked install when `forge_source_drift=true`.
+
+Forge treats workflow kits as routed capabilities, not always-on prompt bulk. BMAD is the planning source, Superpowers is the execution discipline layer, gstack is a manual gate, and Compound Engineering/GSD stay manual-approval unless explicitly enabled for learnings or state handoff.
+
 ## Repository Layout
 
 ```text
@@ -35,25 +59,26 @@ From this repository root:
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-ForgeLocal.ps1 -RepoPath "<repo>"
 ```
 
-The installer copies commands, skill, docs, scripts, and hooks into the current user's Claude Code configuration and the target project's `.claude/hooks` directory.
+The installer copies commands, skill, docs, scripts, and hooks into the current user's Claude Code configuration and the target project's `.claude/hooks` directory. It also writes `forge.cmd` to `%USERPROFILE%\.local\bin`, so `forge doctor`, `forge task new`, and `forge verify` work once that directory is on `PATH`.
 
 ## Health Check
 
 After installation:
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Quick -RepoPath "<repo>"
+forge doctor -RepoPath "<repo>"
 ```
 
 For deeper validation:
 
 ```powershell
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\scripts\Invoke-ForgeHealth.ps1" -Mode Offline -RepoPath "<repo>"
+forge verify -RepoPath "<repo>" -Full
 ```
 
 ## Contributing And Releases
 
 - Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Architecture boundaries: [docs/architecture/boundaries.md](./docs/architecture/boundaries.md)
 - Release checklist: [docs/release-checklist.md](./docs/release-checklist.md)
 - License: [MIT](./LICENSE)
 - Minimal example: [examples/minimal-project](./examples/minimal-project)

@@ -1,0 +1,72 @@
+name: Forge Readiness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/absorb-flowkit-trellis
+
+jobs:
+  readiness:
+    name: Forge readiness
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -Include *.ps1,*.psm1 -File
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) {
+              throw "$($file.FullName): $($errors[0].Message)"
+            }
+          }
+
+      - name: Quick health
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . -Json
+
+      - name: Sync audit
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          # audit 期望 ~/.claude/hooks/ 已就位，CI runner 无此目录会必失败
+          # 保留输出供人工查看，不阻断 CI（详见 ~/.claude/docs/forge-fix-8-reports/）
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Sync-ForgeProjects.ps1 -RepoPath . -Json
+
+      - name: Offline health
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          # Offline 模式期望 ~/.claude/vendors/forge-upstreams/ 与 ~/.claude/skills/forge/evals/ 已就位
+          # CI runner 无这些目录，必失败。保留输出供 PR 评审，不阻断 merge gate
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-ForgeHealth.ps1 -Mode Offline -RepoPath . -LiveMaxAgeHours 999999 -Json
+
+      - name: Tracked examples
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeTrackedExamples.ps1 -RepoPath . -Json
+
+      - name: Smoke
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\forge-smoke.ps1 -EvalsPath .\evals\forge-smoke.evals.json -NoLog -SkipReleaseReadiness
+
+      - name: Release readiness
+        shell: pwsh
+        run: |
+          pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeReleaseReadiness.ps1 -RepoPath . -SkipSmoke -Json
+
+      - name: Git whitespace check
+        shell: pwsh
+        run: |
+          git diff --check
