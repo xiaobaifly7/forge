@@ -2,14 +2,29 @@
 param(
     [string]$Prompt,
     [ValidateSet('quick','build','fix','full','ship','full-auto')][string]$Mode = 'full',
+    [string]$PromptText = '',
     [switch]$Json
 )
 $ErrorActionPreference = 'Stop'
-$text = ([string]$Prompt).ToLowerInvariant()
+# 统一 prompt 文本源：PromptText 优先（调用方更明确的显式传参），否则回退 Prompt。
+$rawText = if([string]::IsNullOrEmpty($PromptText)) { [string]$Prompt } else { [string]$PromptText }
+$text = $rawText.ToLowerInvariant()
 $reasons = [System.Collections.Generic.List[string]]::new()
 function Add-Reason($r){ if(-not $reasons.Contains($r)){ [void]$reasons.Add($r) } }
 $explicit = $false
 $execution = $null
+
+# full-auto 反向 gate 白名单（governance §11 升档加强 A）。
+$FullAutoKeywords = @('full-auto','full auto','端到端自动推进','不要分阶段停顿','一气呵成')
+function Test-FullAutoExplicit {
+    param([string]$Source)
+    if([string]::IsNullOrWhiteSpace($Source)) { return $false }
+    $lower = $Source.ToLowerInvariant()
+    foreach($kw in $FullAutoKeywords){
+        if($lower.Contains($kw.ToLowerInvariant())) { return $true }
+    }
+    return $false
+}
 
 # Explicit user intent always wins.
 if($text -match 'full-auto|端到端自动推进|不要分阶段停顿') { $explicit=$true; $execution='full-auto'; Add-Reason 'explicit_full_auto' }
@@ -26,6 +41,34 @@ if(-not $execution){
     else { $execution='auto'; Add-Reason 'default_auto_for_clear_task' }
 }
 
-$result=[ordered]@{ ok=$true; mode=$Mode; execution=$execution; explicit=$explicit; reasons=@($reasons) }
+# full-auto 反向 gate：execution=full-auto 必须由 prompt 中明确关键词触发，否则强制降级。
+$fullAutoExplicit = $false
+$downgradeReason = $null
+if($execution -eq 'full-auto'){
+    $fullAutoExplicit = Test-FullAutoExplicit -Source $rawText
+    if(-not $fullAutoExplicit){
+        $downgradeReason = if([string]::IsNullOrWhiteSpace($rawText)) { 'full_auto_missing_prompt_text' } else { 'full_auto_keyword_absent' }
+        Write-Warning "[forge] full-auto 反向 gate 触发：$downgradeReason；强制降级 execution=guided-full。允许关键词：$($FullAutoKeywords -join ', ')"
+        $execution = 'guided-full'
+        $explicit = $false
+        Add-Reason "downgraded_from_full_auto:$downgradeReason"
+    }
+}
+
+$result=[ordered]@{
+    ok=$true
+    mode=$Mode
+    execution=$execution
+    explicit=$explicit
+    full_auto_explicit=$fullAutoExplicit
+    downgrade_reason=$downgradeReason
+    reasons=@($reasons)
+}
 if($Json){ $result | ConvertTo-Json -Depth 6 }
-else { "forge_execution=$execution"; "explicit=$explicit"; "reasons=$(@($reasons) -join ',')" }
+else {
+    "forge_execution=$execution"
+    "explicit=$explicit"
+    "full_auto_explicit=$fullAutoExplicit"
+    if($downgradeReason){ "downgrade_reason=$downgradeReason" }
+    "reasons=$(@($reasons) -join ',')"
+}

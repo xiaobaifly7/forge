@@ -94,5 +94,12 @@ fallback 记录包含：`original_path`、`write_errors[]`、`record`。其中 `
 
 ### Execution router result
 
-`Resolve-ForgeExecutionMode.ps1 -Json` 输出：`mode`、`execution`、`explicit` 与 `reasons[]`。允许的 execution：`guided-full`、`auto`、`audit-only`、`full-auto`。用户显式 guide/auto/full-auto 必须优先于自动判断。
+`Resolve-ForgeExecutionMode.ps1 -Json` 输出：`mode`、`execution`、`explicit`、`full_auto_explicit`、`downgrade_reason` 与 `reasons[]`。允许的 execution：`guided-full`、`auto`、`audit-only`、`full-auto`。用户显式 guide/auto/full-auto 必须优先于自动判断。
+
+**full-auto 反向 gate（governance §11 升档加强 A，2026-05-17 起生效）**：
+- 新增可选参数 `-PromptText <string>`，与 `-Prompt` 等价；同时传入时 `PromptText` 优先。
+- 当 `execution=full-auto` 时，必须能从 prompt 文本匹配白名单关键词之一（`full-auto` / `full auto` / `端到端自动推进` / `不要分阶段停顿` / `一气呵成`），否则强制降级为 `guided-full`。
+- 降级时 `full_auto_explicit=false` 且 `downgrade_reason` 取 `full_auto_missing_prompt_text`（prompt 为空）或 `full_auto_keyword_absent`（prompt 不含关键词）；通过 stderr 写入 `Write-Warning`。
+- `reasons[]` 追加 `downgraded_from_full_auto:<reason>` 便于排障。
+- 旧调用方（仅传 `-Prompt -Mode -Json`）行为不变。
 
