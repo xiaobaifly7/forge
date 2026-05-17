@@ -127,8 +127,19 @@ try {
     $routingPath = Join-Path $claudeDir 'forge-routing.jsonl'
 
     # repo 既无 forge state 也无 routing 日志 → 非活跃 forge 会话，跳过 audit，规避 lastHintSessionId 跨项目 false positive
-    if (-not (Test-Path -LiteralPath $statePath) -and -not (Test-Path -LiteralPath $routingPath)) {
-        Write-HookMetrics -Hook $hookName -Event $Event -Tool '' -Verdict 'skip-no-forge-state' -DurationMs ((Get-Date) - $hookStart).TotalMilliseconds -Extra @{ repo_root=$repoRoot; issue_count=0 }
+    # state 是 repo_contract_stub 或 inactive → 同样跳过，规避 playgrounds 类项目持续报 not_guided_full_state 等噪音
+    $stateIsStub = $false
+    if (Test-Path -LiteralPath $statePath) {
+        try {
+            $stateObj = Get-Content -Raw -LiteralPath $statePath -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+            if (($stateObj.ContainsKey('mode') -and $stateObj.mode -eq 'repo_contract_stub') -or
+                ($stateObj.ContainsKey('status') -and $stateObj.status -eq 'inactive')) {
+                $stateIsStub = $true
+            }
+        } catch { }
+    }
+    if ($stateIsStub -or (-not (Test-Path -LiteralPath $statePath) -and -not (Test-Path -LiteralPath $routingPath))) {
+        Write-HookMetrics -Hook $hookName -Event $Event -Tool '' -Verdict 'skip-no-forge-state' -DurationMs ((Get-Date) - $hookStart).TotalMilliseconds -Extra @{ repo_root=$repoRoot; issue_count=0; stub=$stateIsStub }
         exit 0
     }
 
@@ -238,6 +249,16 @@ try {
             $phase = Get-StateValue -State $state -Name 'phase'
             if ($phase -match '^M1' -and -not (Test-Path -LiteralPath $routingPath)) {
                 Add-Issue $issues 'm1_phase_without_routing_log'
+            }
+        }
+
+        # ── enforcement 闭环：事后审计本会话产物，违规仅记录不拦截 ─
+        $auditStopScript = Get-ClaudeScriptPath -Name 'forge-audit-stop.ps1'
+        if (Test-Path -LiteralPath $auditStopScript) {
+            try {
+                & pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $auditStopScript -RepoPath $repoRoot -Json | Out-Null
+            } catch {
+                Write-FallbackLog -Code 'audit_stop_subprocess_failed' -Detail $_.Exception.Message -Repo $repoRoot
             }
         }
     }
