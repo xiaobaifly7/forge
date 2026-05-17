@@ -1,3 +1,42 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "timeout": 5000,
+            "type": "command",
+            "command": "pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"F:\\develop\\codex\\forge\\.claude\\hooks\\forge-pretool-guard.ps1\""
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "timeout": 5000,
+            "type": "command",
+            "statusMessage": "Forge SessionStart audit...",
+            "command": "pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"F:\\develop\\codex\\forge\\.claude\\hooks\\forge-session-audit.ps1\" -Event SessionStart"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "timeout": 8000,
+            "type": "command",
+            "statusMessage": "Forge Stop audit (fail-close)...",
+            "command": "pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"F:\\develop\\codex\\forge\\.claude\\hooks\\forge-session-audit.ps1\" -Event Stop -Mode fail-close"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  }
 }
