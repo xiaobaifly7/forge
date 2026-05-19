@@ -122,14 +122,19 @@ switch ($Command) {
         $versionPath = Join-Path $RepoRoot "version.json"
         $sourceInfo = @{}
         if (-not (Test-Path -LiteralPath $versionPath)) {
-            $sourcePathForVersion = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
-            if (Test-Path -LiteralPath $sourcePathForVersion) {
+            $sourcePathCandidates = @(
+                (Join-Path $env:USERPROFILE ".claude\forge-source.txt"),
+                (Join-Path $env:USERPROFILE ".codex\forge-source.txt")
+            )
+            foreach ($sourcePathForVersion in $sourcePathCandidates) {
+                if (-not (Test-Path -LiteralPath $sourcePathForVersion)) { continue }
                 foreach ($line in Get-Content -LiteralPath $sourcePathForVersion -Encoding UTF8) {
                     if ($line -match '^forge_source_repo=(.+)$') {
                         $candidateVersionPath = Join-Path $Matches[1] "version.json"
                         if (Test-Path -LiteralPath $candidateVersionPath) { $versionPath = $candidateVersionPath; break }
                     }
                 }
+                if (Test-Path -LiteralPath $versionPath) { break }
             }
         }
         if (Test-Path -LiteralPath $versionPath) {
@@ -143,7 +148,7 @@ switch ($Command) {
             $sha = & git -C $RepoRoot rev-parse --short HEAD 2>$null
             if ($LASTEXITCODE -eq 0 -and $sha) { Write-Output "forge_commit=$sha" }
         } catch {}
-        $sourcePath = Join-Path $env:USERPROFILE ".claude\forge-source.txt"
+        $sourcePath = @(Join-Path $env:USERPROFILE ".claude\forge-source.txt"; Join-Path $env:USERPROFILE ".codex\forge-source.txt") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         if (Test-Path -LiteralPath $sourcePath) {
             foreach ($line in Get-Content -LiteralPath $sourcePath -Encoding UTF8) {
                 Write-Output $line

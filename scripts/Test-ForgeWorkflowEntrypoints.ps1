@@ -75,20 +75,18 @@ if ($gstackStatus -eq "missing") { Add-Issue "workflow_missing:gstack" }
 
 $compoundGlobal = Get-ChildItem -LiteralPath (Join-Path $ClaudeRoot "skills") -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(ce-|compound)' } | Select-Object -First 1
 $compoundVendor = Join-Path $VendorRoot "compound-engineering"
-$compoundStatus = if ($compoundGlobal) { "active_global_skill" } elseif (Test-Path -LiteralPath $compoundVendor) { "vendor_only_manual_approval" } else { "missing" }
-if ($compoundStatus -eq "missing") { Add-Issue "workflow_missing:compound" }
+$compoundStatus = if ($compoundGlobal) { "active_global_skill" } elseif (Test-Path -LiteralPath $compoundVendor) { "vendor_only_manual_approval" } else { "optional_not_installed" }
 
 $gsdGlobal = Get-ChildItem -LiteralPath (Join-Path $ClaudeRoot "skills") -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(gsd|gsd-2)' } | Select-Object -First 1
 $gsdVendor = Join-Path $VendorRoot "gsd-2"
-$gsdStatus = if ($gsdGlobal) { "active_global_skill" } elseif (Test-Path -LiteralPath $gsdVendor) { "vendor_only_manual_approval" } else { "missing" }
-if ($gsdStatus -eq "missing") { Add-Issue "workflow_missing:gsd" }
+$gsdStatus = if ($gsdGlobal) { "active_global_skill" } elseif (Test-Path -LiteralPath $gsdVendor) { "vendor_only_manual_approval" } else { "optional_not_installed" }
 
 $results = @(
     (New-WorkflowResult -Name "bmad" -Status $bmadStatus -Policy "staging_first" -Evidence (Get-ExistingPaths @($repoBmad, $bmadStaging, $bmadVendor)) -Note "L3/L4/full planning source"),
     (New-WorkflowResult -Name "superpowers" -Status $superpowersStatus -Policy "marketplace_managed" -Evidence (Get-ExistingPaths $superpowersPaths) -Note "execution, TDD, debugging, verification"),
     (New-WorkflowResult -Name "gstack" -Status $gstackStatus -Policy "gate_only_manual_toggle" -Evidence (Get-ExistingPaths @($gstackActive, $gstackDisabled, $gstackVendor)) -Note "review, QA, ship, canary, benchmark gate"),
-    (New-WorkflowResult -Name "compound" -Status $compoundStatus -Policy "manual_approval" -Evidence (Get-ExistingPaths @($(if($compoundGlobal){$compoundGlobal.FullName}else{$null}), $compoundVendor)) -Note "high-value learnings and selected ce-* commands only"),
-    (New-WorkflowResult -Name "gsd" -Status $gsdStatus -Policy "manual_approval" -Evidence (Get-ExistingPaths @($(if($gsdGlobal){$gsdGlobal.FullName}else{$null}), $gsdVendor)) -Note "state handoff and next actions; no separate DSD workflow")
+    (New-WorkflowResult -Name "compound" -Status $compoundStatus -Policy "manual_approval" -Evidence (Get-ExistingPaths @($(if($compoundGlobal){$compoundGlobal.FullName}else{$null}), $compoundVendor)) -Note "optional high-value learnings and selected ce-* commands; install only after manual approval"),
+    (New-WorkflowResult -Name "gsd" -Status $gsdStatus -Policy "manual_approval" -Evidence (Get-ExistingPaths @($(if($gsdGlobal){$gsdGlobal.FullName}else{$null}), $gsdVendor)) -Note "optional state handoff and next actions; install only after manual approval")
 )
 
 $blocking = @($results | Where-Object { $_.status -eq "missing" -and $_.name -in @("bmad", "superpowers") })
