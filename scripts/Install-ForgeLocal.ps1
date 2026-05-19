@@ -3,6 +3,7 @@ param(
   [string]$RepoPath,
 
   [string]$ClaudeRoot = (Join-Path $env:USERPROFILE ".claude"),
+  [string]$CodexRoot = (Join-Path $env:USERPROFILE ".codex"),
   [string]$BinDir = (Join-Path $env:USERPROFILE ".local\bin")
 )
 
@@ -22,14 +23,42 @@ function Copy-ForgeTree {
   Copy-Item -Path (Join-Path $Source "*") -Destination $Destination -Recurse -Force
 }
 
+function Install-ForgeUserRoot {
+  param(
+    [Parameter(Mandatory=$true)][string]$UserRoot,
+    [Parameter(Mandatory=$true)][string]$RepoRoot
+  )
+
+  Copy-ForgeTree -Source (Join-Path $RepoRoot "commands") -Destination (Join-Path $UserRoot "commands")
+  Copy-ForgeTree -Source (Join-Path $RepoRoot "skills") -Destination (Join-Path $UserRoot "skills")
+  Copy-ForgeTree -Source (Join-Path $RepoRoot "docs") -Destination (Join-Path $UserRoot "docs")
+  Copy-ForgeTree -Source (Join-Path $RepoRoot "scripts") -Destination (Join-Path $UserRoot "scripts")
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$sourceInfoCandidates = @(
+  (Join-Path $ClaudeRoot "forge-source.txt"),
+  (Join-Path $CodexRoot "forge-source.txt")
+)
+if (($repoRoot -ieq $ClaudeRoot -or $repoRoot -ieq $CodexRoot)) {
+  foreach ($sourceInfoPath in $sourceInfoCandidates) {
+    if (-not (Test-Path -LiteralPath $sourceInfoPath)) { continue }
+    foreach ($line in Get-Content -LiteralPath $sourceInfoPath -Encoding UTF8) {
+      if ($line -match '^forge_source_repo=(.+)$' -and (Test-Path -LiteralPath $Matches[1])) {
+        $repoRoot = (Resolve-Path -LiteralPath $Matches[1]).Path
+        break
+      }
+    }
+    if (-not ($repoRoot -ieq $ClaudeRoot -or $repoRoot -ieq $CodexRoot)) { break }
+  }
+}
+
 $resolvedRepoPath = (Resolve-Path -LiteralPath $RepoPath).Path
 $projectClaude = Join-Path $resolvedRepoPath ".claude"
 
-Copy-ForgeTree -Source (Join-Path $repoRoot "commands") -Destination (Join-Path $ClaudeRoot "commands")
-Copy-ForgeTree -Source (Join-Path $repoRoot "skills") -Destination (Join-Path $ClaudeRoot "skills")
-Copy-ForgeTree -Source (Join-Path $repoRoot "docs") -Destination (Join-Path $ClaudeRoot "docs")
-Copy-ForgeTree -Source (Join-Path $repoRoot "scripts") -Destination (Join-Path $ClaudeRoot "scripts")
+Install-ForgeUserRoot -UserRoot $ClaudeRoot -RepoRoot $repoRoot
+Install-ForgeUserRoot -UserRoot $CodexRoot -RepoRoot $repoRoot
+
 $installProjectHooks = -not ([System.IO.Path]::GetFullPath($resolvedRepoPath).TrimEnd('\', '/') -ieq [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/'))
 if ($installProjectHooks) {
   Copy-ForgeTree -Source (Join-Path $repoRoot "hooks") -Destination (Join-Path $projectClaude "hooks")
@@ -54,9 +83,11 @@ $sourceInfo = @(
   "forge_installed_at=$((Get-Date).ToString('o'))"
 )
 Set-Content -LiteralPath (Join-Path $ClaudeRoot "forge-source.txt") -Encoding UTF8 -Value $sourceInfo
+Set-Content -LiteralPath (Join-Path $CodexRoot "forge-source.txt") -Encoding UTF8 -Value $sourceInfo
 
 Write-Output "forge_install=ok"
 Write-Output "claude_root=$ClaudeRoot"
+Write-Output "codex_root=$CodexRoot"
 Write-Output "repo_path=$resolvedRepoPath"
 if (-not $installProjectHooks) { Write-Output "project_hooks=skipped_source_repo" }
 Write-Output "forge_cmd=$shimPath"

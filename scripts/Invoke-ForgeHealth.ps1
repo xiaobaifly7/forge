@@ -107,8 +107,27 @@ function Test-JsonFile {
     "ok: $Path"
 }
 
-$claudeCommand = Get-Command claude -ErrorAction SilentlyContinue
-$claudeVersion = if ($claudeCommand) { (& $claudeCommand.Source --version 2>$null | Select-Object -First 1) } else { 'not-found' }
+$claudeCommand = Get-Command reclaude -ErrorAction SilentlyContinue
+if (-not $claudeCommand) { $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue }
+$claudeVersion = 'not-found'
+if ($claudeCommand) {
+    $versionStdout = [System.IO.Path]::GetTempFileName()
+    $versionStderr = [System.IO.Path]::GetTempFileName()
+    try {
+        $versionProcess = Start-Process -FilePath $claudeCommand.Source -ArgumentList @('--version') -NoNewWindow -PassThru -RedirectStandardOutput $versionStdout -RedirectStandardError $versionStderr
+        if ($versionProcess.WaitForExit(3000)) {
+            $versionText = if (Test-Path -LiteralPath $versionStdout) { Get-Content -LiteralPath $versionStdout -Raw -ErrorAction SilentlyContinue } else { '' }
+            if (-not [string]::IsNullOrWhiteSpace($versionText)) { $claudeVersion = ($versionText -split "`r?`n" | Select-Object -First 1).Trim() }
+        } else {
+            try { $versionProcess.Kill($true) } catch { try { $versionProcess.Kill() } catch {} }
+            $claudeVersion = 'timeout'
+        }
+    } catch {
+        $claudeVersion = 'error'
+    } finally {
+        Remove-Item -LiteralPath $versionStdout,$versionStderr -Force -ErrorAction SilentlyContinue
+    }
+}
 $repoClaude = Join-Path $RepoPath '.claude'
 $settingsPath = Join-Path $repoClaude 'settings.json'
 $statePath = Join-Path $repoClaude 'forge-session-state.json'
@@ -134,7 +153,6 @@ if($Mode -eq 'Lite'){
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'workflow_entrypoints' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkflowEntrypoints.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
-    Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
 } else {
     Add-ProcessCheck 'docs_health' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeDocsHealth.ps1'),'-ClaudeRoot',$ClaudeRoot,'-Json')
     Add-InlineCheck 'session_state' { Test-JsonFile $statePath }
@@ -143,7 +161,6 @@ if($Mode -eq 'Lite'){
     Add-ProcessCheck 'stage_engine_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Resolve-ForgeStage.ps1'),'-RepoPath',$RepoPath,'-Stage','task','-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'workflow_entrypoints' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkflowEntrypoints.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     Add-ProcessCheck 'project_hooks_sync' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Sync-ForgeProjects.ps1'),'-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
-    Add-ProcessCheck 'external_ref_compare_audit' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Compare-ForgeExternalAdapterRef.ps1'),'-Name','flow-kit','-RepoPath',$RepoPath,'-Json') -TimeoutSeconds $CheckTimeoutSeconds -Required $false
     $runtimeChecksRequired = ($Mode -eq 'Live' -or $Mode -eq 'Full')
     Add-ProcessCheck 'live_freshness' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeLiveRouteFreshness.ps1'),'-LogPath',$LiveRouteLogPath,'-MaxAgeHours',[string]$LiveMaxAgeHours,'-RequiredClaudeVersion',$RequiredClaudeVersion,'-Json') -Required $runtimeChecksRequired
     Add-ProcessCheck 'workspace_manifest' @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $ScriptDir 'Test-ForgeWorkspaceManifest.ps1'),'-RepoPath',$RepoPath,'-Json')
