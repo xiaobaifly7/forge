@@ -87,10 +87,8 @@ foreach ($root in @($SearchRoot)) {
     }
 }
 
-if ($candidates.Count -lt 1) {
-    foreach ($fallback in @($ForgeRoot, "D:\develop\code\energy", "F:\develop\codex\playgrounds")) {
-        if ((Test-Path -LiteralPath $fallback) -and (Test-ProjectHasForge -RepoRoot $fallback)) { Add-RepoCandidate -Items $candidates -Path $fallback }
-    }
+if ($candidates.Count -lt 1 -and (Test-ProjectHasForge -RepoRoot $ForgeRoot)) {
+    Add-RepoCandidate -Items $candidates -Path $ForgeRoot
 }
 
 $sourceCommit = ""

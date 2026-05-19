@@ -1,154 +1,28 @@
 {
   "schema_version": 1,
-  "repo": "F:\\develop\\codex\\playgrounds",
-  "generated_at": "2026-05-06T19:56:20.6561695+08:00",
+  "repo": "<repo>",
+  "generated_at": "<iso8601>",
   "entries": [
     {
       "path": ".claude\\settings.json",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\settings.json",
+      "full_path": "<repo>\\.claude\\settings.json",
       "exists": true,
-      "sha256": "5d92db3d02d50c96e237ecfe1bb6ff959e295893fa40081f727c4a19defcb6ff",
-      "length": 1245
+      "sha256": "<sha256>",
+      "length": 1234
     },
     {
       "path": ".claude\\hooks\\forge-pretool-guard.ps1",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\hooks\\forge-pretool-guard.ps1",
+      "full_path": "<repo>\\.claude\\hooks\\forge-pretool-guard.ps1",
       "exists": true,
-      "sha256": "b5f4eb6141b3b6edfe57d02b40e7c73918e767f69fdbc316aa69f0d9c1e99a97",
-      "length": 14931
+      "sha256": "<sha256>",
+      "length": 1234
     },
     {
-      "path": ".claude\\hooks\\forge-session-audit.ps1",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\hooks\\forge-session-audit.ps1",
+      "path": "%USERPROFILE%\\.claude\\scripts\\forge-smoke.ps1",
+      "full_path": "%USERPROFILE%\\.claude\\scripts\\forge-smoke.ps1",
       "exists": true,
-      "sha256": "b33f628a7fbdacaff6bfe41348d93fc603c1492e02e370ee53f5b829faee388e",
-      "length": 15085
-    },
-    {
-      "path": ".claude\\hooks\\forge-hook-common.psm1",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\hooks\\forge-hook-common.psm1",
-      "exists": true,
-      "sha256": "dd7a47922fced01d8e5b090c2cfce1ce18bc7f8c942789a2e190f18183f0af3f",
-      "length": 11591
-    },
-    {
-      "path": ".claude\\hooks\\tests\\forge-hook.Tests.ps1",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\hooks\\tests\\forge-hook.Tests.ps1",
-      "exists": true,
-      "sha256": "52f78f4b563673d0ed9e48167b33d8f4f66ce8c40e5648787dad314d9773b1bb",
-      "length": 11568
-    },
-    {
-      "path": ".claude\\workflow-policy.md",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\workflow-policy.md",
-      "exists": true,
-      "sha256": "7618532881413112e10701446b0aa230df01d70f0db996709baa563feddee4fe",
-      "length": 7033
-    },
-    {
-      "path": ".claude\\project-profile.json",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\project-profile.json",
-      "exists": true,
-      "sha256": "57e38410097a7b05b0d0dd7ba2dc8d3f2415239017691d3d90274b951b08d976",
-      "length": 5202
-    },
-    {
-      "path": ".claude\\forge-session-state.json",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\forge-session-state.json",
-      "exists": false,
-      "sha256": null,
-      "length": null
-    },
-    {
-      "path": ".claude\\forge-session.lock.json",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\forge-session.lock.json",
-      "exists": false,
-      "sha256": null,
-      "length": null
-    },
-    {
-      "path": ".claude\\forge-routing.jsonl",
-      "full_path": "F:\\develop\\codex\\playgrounds\\.claude\\forge-routing.jsonl",
-      "exists": true,
-      "sha256": "4d4f27733bc120844a718f8304d4f6001e7b6762b7be96f3340df628c7faa3df",
-      "length": 2167
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\forge-smoke.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\forge-smoke.ps1",
-      "exists": true,
-      "sha256": "b30e2326be1392824fb9d8e808e68b2b72e970e237671df73fc7d77df6a722ad",
-      "length": 42253
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeDocsHealth.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeDocsHealth.ps1",
-      "exists": true,
-      "sha256": "067779587503d39f61f3fd726a601991a15e4287ab8de2a41a381d4285138654",
-      "length": 10898
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeM1Compliance.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeM1Compliance.ps1",
-      "exists": true,
-      "sha256": "04f84dfda42fa1d769f66b32c7ee06b0d2d46db29eccdce4615200446676ead7",
-      "length": 10391
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeLiveRouteFreshness.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeLiveRouteFreshness.ps1",
-      "exists": true,
-      "sha256": "4e9fbc66bcc2fdc904b5c5a16b7a829049b8f6fc0cd8dff01545f49d625f70c6",
-      "length": 8411
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Reset-ForgeSessionState.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Reset-ForgeSessionState.ps1",
-      "exists": true,
-      "sha256": "07d5d2462cc9b63f6644dba2888c29a724580b3583bea2760ea6e1bd1f127be0",
-      "length": 6012
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Rotate-ForgeAuditLogs.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Rotate-ForgeAuditLogs.ps1",
-      "exists": true,
-      "sha256": "fafa00848faca39f89a656f2672ecc48a7492052af20991b18e2c33a0bc635cd",
-      "length": 2227
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeWorkspaceManifest.ps1",
-      "full_path": "C:\\Users\\Administrator\\.claude\\scripts\\Test-ForgeWorkspaceManifest.ps1",
-      "exists": true,
-      "sha256": "475f2cd17379114be59c15f9e1ad08646bbb8be7753e1d578a573d784749bc4c",
-      "length": 4767
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\skills\\forge\\evals\\evals.json",
-      "full_path": "C:\\Users\\Administrator\\.claude\\skills\\forge\\evals\\evals.json",
-      "exists": true,
-      "sha256": "9a0f4fd25544b3aaca01360f559686469804048dd9e473cd72bcb45b5b1b37ff",
-      "length": 9054
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\docs\\forge-protocols.md",
-      "full_path": "C:\\Users\\Administrator\\.claude\\docs\\forge-protocols.md",
-      "exists": true,
-      "sha256": "446146e6282e721a22758657d3bf2663ceca06b476cc71b969fa404f4e88365a",
-      "length": 24303
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\docs\\forge-schema-versions.md",
-      "full_path": "C:\\Users\\Administrator\\.claude\\docs\\forge-schema-versions.md",
-      "exists": true,
-      "sha256": "e734b4c472166dffe90f5fa8bac4886aec3e2c5c9b89abe7ccb8b0268adee601",
-      "length": 5028
-    },
-    {
-      "path": "C:\\Users\\Administrator\\.claude\\docs\\hook-architecture.md",
-      "full_path": "C:\\Users\\Administrator\\.claude\\docs\\hook-architecture.md",
-      "exists": true,
-      "sha256": "bc1bbecce4c9a930a6fe4f3c67e9e97f8cc4174e5e136ac902e9a095c203aed2",
-      "length": 3436
+      "sha256": "<sha256>",
+      "length": 1234
     }
   ]
 }

@@ -159,13 +159,14 @@ function Invoke-LiveClaudeRouteSmoke {
             expected_output = "[forge] mode=quick"
         })
     }
-    $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue
+    $claudeCommand = Get-Command reclaude -ErrorAction SilentlyContinue
+    if (-not $claudeCommand) { $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue }
     if (-not $claudeCommand) {
         Write-Output "live_route_total=$($liveCases.Count)"
         Write-Output "live_route_passed=0"
         Write-Output "live_route_failed=0"
         Write-Output "live_route_skipped=$($liveCases.Count)"
-        Write-Output "live_route_skip_reason=claude_not_found"
+        Write-Output "live_route_skip_reason=agent_cli_not_found"
         return
     }
 

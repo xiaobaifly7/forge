@@ -1,16 +1,16 @@
 # Forge
 
-Forge is a Claude Code workflow control plane.
+Forge is a Claude Code + Codex workflow control plane.
 
-Prompt packs tell agents what they should do. Forge checks what agents are actually doing through Claude Code hooks, routing logs, health checks, and smoke tests.
+Prompt packs tell agents what they should do. Forge checks what agents are actually doing through Claude Code hooks, Codex-side installed assets, routing logs, health checks, and smoke tests.
 
 ## Status
 
-This repository is the extracted, public-friendly source layout for a local Forge installation. It currently targets Claude Code on Windows/PowerShell first.
+This repository is the extracted, public-friendly source layout for a local Forge installation. It currently targets Claude Code and Codex on Windows/PowerShell first.
 
 ## What Forge Provides
 
-- A single `/forge` router command for Claude Code.
+- A single `forge` CLI plus Claude Code slash-command assets and Codex-installed workflow assets.
 - A Forge skill that explains routing, levels, risk, and workflow rules.
 - Runtime hooks for write-time guardrails and session/stop audits.
 - PowerShell health and smoke checks for docs, workspace manifest, M1 compliance, live route freshness, and session state.
@@ -47,7 +47,7 @@ commands/              Claude Code slash-command markdown files
 skills/forge/          Forge skill
 docs/                  Protocol, boundary, and schema documents
 scripts/               PowerShell health, smoke, routing, and reset helpers
-hooks/                 Claude Code hook entrypoints
+hooks/                 Claude Code hook entrypoints; Codex consumes the shared scripts/docs/skills without Claude hooks
 examples/              Example project settings and manifest snapshots
 ```
 
@@ -59,7 +59,7 @@ From this repository root:
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Install-ForgeLocal.ps1 -RepoPath "<repo>"
 ```
 
-The installer copies commands, skill, docs, scripts, and hooks into the current user's Claude Code configuration and the target project's `.claude/hooks` directory. It also writes `forge.cmd` to `%USERPROFILE%\.local\bin`, so `forge doctor`, `forge task new`, and `forge verify` work once that directory is on `PATH`.
+The installer copies commands, skill, docs, scripts, and hooks into the current user's `.claude` and `.codex` Forge roots, and installs project hooks under the target project's `.claude/hooks` directory when applicable. It also writes `forge.cmd` to `%USERPROFILE%\.local\bin`, so `forge doctor`, `forge task new`, and `forge verify` work once that directory is on `PATH`.
 
 ## Health Check
 
@@ -94,6 +94,6 @@ Forge is not a replacement for Markdown-first workflow kits such as flow-kit. It
 ## Current Limitations
 
 - Windows/PowerShell paths are still first-class; cross-platform packaging is not done.
-- Some scripts still contain local Claude Code assumptions.
+- Some hooks remain Claude Code-specific by design; shared scripts/docs/skills are installed for both Claude Code and Codex.
 - Public adapter contracts are not fully formalized yet.
 - Existing local installations may need session state and live route coverage refreshed before all health checks pass.

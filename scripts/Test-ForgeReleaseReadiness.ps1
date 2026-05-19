@@ -5,6 +5,7 @@ param(
     [switch]$AllowMissingPrChecks,
     [switch]$SkipSmoke,
     [switch]$Full,
+    [switch]$Strict,
     [switch]$Json
 )
 
@@ -99,6 +100,7 @@ function Get-ReadinessFixHint {
     switch ($Name) {
         { $_ -like "adapter_*_baseline" } { return "Run Compare-ForgeExternalAdapterRef.ps1 -Name <adapter> -RecordBaseline after reviewing upstream drift." }
         "quick_health" { return "Run Invoke-ForgeHealth.ps1 -Mode Quick -RepoPath . and fix failed health checks." }
+        "hook_source_hash" { return "Copy reviewed hook source files from hooks/ to .claude/hooks/ or intentionally remove stale fixture copies." }
         "smoke" { return "Run forge-smoke.ps1 -NoLog -SkipReleaseReadiness and fix the first failed smoke layer." }
         "diff_check" { return "Run git diff --check and remove whitespace/conflict-marker errors." }
         "worktree_status" { return "Commit, stash, or intentionally document the remaining worktree changes." }
@@ -120,6 +122,23 @@ foreach ($name in $manifests) {
     $durationMs = Complete-ReadinessStep -Name $checkName -Ok $baselineOk -Timer $timer
     Add-ReadinessCheck -Name $checkName -Ok $baselineOk -Summary $manifestPath -DurationMs $durationMs
 }
+
+
+$timer = Start-ReadinessStep -Name "hook_source_hash"
+$hookNames = @("forge-pretool-guard.ps1", "forge-session-audit.ps1", "forge-hook-common.psm1")
+$hookDetails = @()
+$hookHashOk = $true
+foreach ($hookName in $hookNames) {
+    $sourceHook = Join-Path $RepoRoot ("hooks\" + $hookName)
+    $fixtureHook = Join-Path $RepoRoot (".claude\hooks\" + $hookName)
+    $sourceHash = if (Test-Path -LiteralPath $sourceHook) { (Get-FileHash -LiteralPath $sourceHook -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
+    $fixtureHash = if (Test-Path -LiteralPath $fixtureHook) { (Get-FileHash -LiteralPath $fixtureHook -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
+    $matches = ($sourceHash -and $fixtureHash -and $sourceHash -eq $fixtureHash)
+    if (-not $matches) { $hookHashOk = $false }
+    $hookDetails += [ordered]@{ name=$hookName; source_exists=[bool]$sourceHash; fixture_exists=[bool]$fixtureHash; matches_source=[bool]$matches }
+}
+$durationMs = Complete-ReadinessStep -Name "hook_source_hash" -Ok $hookHashOk -Timer $timer
+Add-ReadinessCheck -Name "hook_source_hash" -Ok $hookHashOk -Summary "hooks/ vs .claude/hooks fixture hashes" -Details @($hookDetails) -DurationMs $durationMs
 
 $timer = Start-ReadinessStep -Name "quick_health"
 $healthMode = if ($Full) { "Quick" } else { "Lite" }
@@ -186,13 +205,15 @@ if (-not [string]::IsNullOrWhiteSpace($PrNumber)) {
 
 $errors = @($checks | Where-Object { -not $_.ok -and $_.severity -eq "error" })
 $warnings = @($checks | Where-Object { -not $_.ok -and $_.severity -eq "warning" })
+$strictWarningsFail = [bool]($Strict -or $Full)
 $result = [ordered]@{
-    ok = ($errors.Count -eq 0)
+    ok = ($errors.Count -eq 0 -and (-not $strictWarningsFail -or $warnings.Count -eq 0))
     repo = $RepoRoot
     checked_at = (Get-Date).ToString("o")
     checks = @($checks)
     failed = @($errors | ForEach-Object { $_.name })
     warnings = @($warnings | ForEach-Object { $_.name })
+    strict_warnings_fail = $strictWarningsFail
 }
 
 if ($Json) {

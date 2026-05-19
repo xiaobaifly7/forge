@@ -14,6 +14,7 @@ param(
     [switch]$Json,
     [switch]$SkipSmoke,
     [switch]$Full,
+    [switch]$Strict,
     [switch]$Quick,
     [switch]$FixDrift,
     [switch]$Apply,
@@ -33,7 +34,7 @@ function Show-ForgeHelp {
     Write-Output "Usage:"
     Write-Output "  forge doctor [-RepoPath .] [-Json]"
     Write-Output "  forge task new -Title `"Fix bug`" [-Name task-slug] [-RepoPath .] [-Json]"
-    Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Full] [-Json]"
+    Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Full] [-Strict] [-Json]"
     Write-Output "  forge smoke [-RepoPath .] [-Quick]"
     Write-Output "  forge install -RepoPath <repo>"
     Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
@@ -83,6 +84,7 @@ switch ($Command) {
         if (-not [string]::IsNullOrWhiteSpace($PrNumber)) { $args += @("-PrNumber", $PrNumber) }
         if ($SkipSmoke) { $args += "-SkipSmoke" }
         if ($Full) { $args += "-Full" }
+        if ($Strict) { $args += "-Strict" }
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Test-ForgeReleaseReadiness.ps1" -Arguments $args
     }

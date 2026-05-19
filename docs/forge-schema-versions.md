@@ -86,7 +86,7 @@ fallback 记录包含：`original_path`、`write_errors[]`、`record`。其中 `
 
 `Test-GstackLocalPatches.ps1 -Json` 输出 `checks[]` 与 `issues[]`，覆盖 `voice-triggers`、`getHostConfig('claude')`、`skipSkills`、`LOCAL-PATCHES.md` 与 `gstack-global-discover.exe`。
 
-`Test-ForgeWorkflowEntrypoints.ps1 -Json` 输出 `workflows[]` 与 `issues[]`。每个 workflow 包含 `name`、`status`、`policy`、`evidence[]`、`note`。标准状态包括：`active_repo_local`、`staging_active`、`marketplace_active`、`active_global_skill`、`disabled_available`、`vendor_only`、`vendor_only_manual_approval` 与 `missing`。
+`Test-ForgeWorkflowEntrypoints.ps1 -Json` 输出 `workflows[]` 与 `issues[]`。每个 workflow 包含 `name`、`status`、`policy`、`evidence[]`、`note`。标准状态包括：`active_repo_local`、`staging_active`、`marketplace_active`、`active_global_skill`、`disabled_available`、`vendor_only`、`vendor_only_manual_approval`、`optional_not_installed` 与 `missing`。
 
 ### Gstack exported patch artifacts
 

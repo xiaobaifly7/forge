@@ -139,7 +139,13 @@ foreach ($execution in $requiredExecutions) {
 }
 
 $claudeVersion = $null
-try { $claudeVersion = (& claude --version 2>$null | Select-Object -First 1).Trim() } catch {}
+$claudeCommand = Get-Command reclaude -ErrorAction SilentlyContinue
+if (-not $claudeCommand) { $claudeCommand = Get-Command claude -ErrorAction SilentlyContinue }
+try {
+    if ($claudeCommand) {
+        $claudeVersion = (& $claudeCommand.Source --version 2>$null | Select-Object -First 1).Trim()
+    }
+} catch {}
 if ($RequiredClaudeVersion) {
     if (-not $claudeVersion -or $claudeVersion -notmatch [regex]::Escape($RequiredClaudeVersion)) { Add-Issue 'claude_version_mismatch' }
 }

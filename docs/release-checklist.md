@@ -80,7 +80,9 @@ workspace manifest：
 
 ```powershell
 pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-ForgeWorkspaceManifest.ps1 -RepoPath . -Json
-Remove-Item -LiteralPath .\.claude -Recurse -Force
+Get-ChildItem -LiteralPath .\.claude -Force  # review first
+# If this is only generated local state, remove it manually after backup/review.
+# Remove-Item -LiteralPath .\.claude -Recurse -Force
 ```
 
 smoke：
