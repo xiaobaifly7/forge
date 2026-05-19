@@ -28,11 +28,11 @@ function Test-FullAutoExplicit {
 
 # Explicit user intent always wins.
 if($text -match 'full-auto|端到端自动推进|不要分阶段停顿') { $explicit=$true; $execution='full-auto'; Add-Reason 'explicit_full_auto' }
+elseif($text -match '只读|只看|看一下|看看|审计|audit-only|不要改文件|不改文件|别改文件|无需修改|不用修改|只做分析|仅分析|状态确认|查状态|评估一下|梳理一下|总结一下') { $explicit=$true; $execution='audit-only'; Add-Reason 'explicit_readonly_or_audit' }
 elseif($text -match '(?<!不)(?<!别)(?<!无需)(?<!不要)\bauto\b|自动模式|自动去做|自动执行|自己做完|直接做完|直接搞定|全自动') { $explicit=$true; $execution='auto'; Add-Reason 'explicit_auto' }
 elseif($text -match '\bguide\b|guided|指导模式|引导模式|带我一步步|一步一步|一步步|教我|先问我|每步确认|分阶段确认|等我确认') { $explicit=$true; $execution='guided-full'; Add-Reason 'explicit_guided' }
 
 if(-not $execution){
-    if($text -match '只读|只看|看一下|看看|审计|audit-only|不要改文件|不改文件|别改文件|无需修改|不用修改|只做分析|仅分析|状态确认|查状态|评估一下|梳理一下|总结一下') { $execution='audit-only'; Add-Reason 'explicit_readonly_or_audit' }
     if($Mode -eq 'quick') { $execution='audit-only'; Add-Reason 'quick_audit_only' }
     elseif($Mode -eq 'full-auto') { $execution='full-auto'; Add-Reason 'mode_full_auto' }
     elseif($Mode -eq 'ship') { $execution='auto'; Add-Reason 'ship_default_auto_with_gate' }

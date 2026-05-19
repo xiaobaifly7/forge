@@ -180,7 +180,7 @@
     {
       "id": "live-quick-readonly",
       "prompt": "只读看一下这个项目有哪些优化点，不要改文件",
-      "expected_output": "[forge] mode=quick",
+      "expected_output": "[forge] mode=full",
       "expected_execution": "audit-only"
     },
     {

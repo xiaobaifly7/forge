@@ -141,6 +141,15 @@ function Get-ExpectedExecution {
     return 'auto'
 }
 
+function Get-ExpectedExecutionForPrompt {
+    param([string]$Prompt, [string]$Mode)
+    $promptText = [string]$Prompt
+    if ($promptText -match '只读|只看|看一下|看看|审计|audit-only|不要改文件|不改文件|别改文件|无需修改|不用修改|只做分析|仅分析|状态确认|查状态|评估一下|梳理一下|总结一下') {
+        return 'audit-only'
+    }
+    return (Get-ExpectedExecution -Case ([ordered]@{ prompt = $Prompt }) -Mode $Mode)
+}
+
 function Get-ActualExecutionOffline {
     param([hashtable]$Case, [string]$Mode)
     $prompt = [string]$Case.prompt
@@ -177,7 +186,7 @@ function Invoke-LiveClaudeRouteSmoke {
     $liveSkipReasons = New-Object System.Collections.Generic.List[string]
     foreach ($case in $liveCases) {
         $expected = Get-ExpectedMode -Case $case
-        $expectedExecution = Get-ExpectedExecution -Case $case -Mode $expected
+        $expectedExecution = Get-ExpectedExecutionForPrompt -Prompt $case.prompt -Mode $expected
         $prompt = [string]$case.prompt
         $output = ""
         $exit = 0

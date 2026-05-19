@@ -150,6 +150,28 @@ if ($RequiredClaudeVersion) {
     if (-not $claudeVersion -or $claudeVersion -notmatch [regex]::Escape($RequiredClaudeVersion)) { Add-Issue 'claude_version_mismatch' }
 }
 
+$requiredPromptCases = @(
+    @{ mode = 'full'; prompt = '只读看一下这个项目，不要改文件'; expected = 'audit-only' },
+    @{ mode = 'fix'; prompt = '这个 bug 需要修一下'; expected = 'auto' },
+    @{ mode = 'full'; prompt = '设计并实现一个新的支付模块，涉及认证和数据库'; expected = 'guided-full' },
+    @{ mode = 'full-auto'; prompt = '端到端自动推进，不要分阶段停顿'; expected = 'full-auto' }
+)
+$promptCaseResults = @()
+foreach ($case in $requiredPromptCases) {
+    $resultJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Resolve-ForgeExecutionMode.ps1') -Prompt ([string]$case.prompt) -Mode ([string]$case.mode) -Json
+    $parsed = $null
+    try { $parsed = $resultJson | ConvertFrom-Json -AsHashtable } catch {}
+    $ok = $parsed -and ([string]$parsed.execution -eq [string]$case.expected)
+    if (-not $ok) { Add-Issue "prompt_case_failed:$($case.mode):$($case.expected)" }
+    $promptCaseResults += [ordered]@{
+        mode = [string]$case.mode
+        prompt = [string]$case.prompt
+        expected = [string]$case.expected
+        actual = if ($parsed) { [string]$parsed.execution } else { 'invalid' }
+        ok = $ok
+    }
+}
+
 $result = [ordered]@{
     ok = ($issues.Count -eq 0)
     log_path = $LogPath
@@ -163,6 +185,7 @@ $result = [ordered]@{
     covered_executions = @($coveredExecutions)
     mode_results = @($modeResults)
     execution_results = @($executionResults)
+    prompt_case_results = @($promptCaseResults)
     issues = @($issues)
 }
 
