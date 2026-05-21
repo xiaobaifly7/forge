@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "ce", "upstreams", "update-frameworks", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "review", "ce", "upstreams", "update-frameworks", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -40,6 +40,7 @@ function Show-ForgeHelp {
     Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
     Write-Output "  forge workflows [-RepoPath .] [-Json]"
     Write-Output "  forge route -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
+    Write-Output "  forge review [-RepoPath .] [-Title `"Task prompt`"] [-Subcommand <mode>] [-Json]"
     Write-Output "  forge ce -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge upstreams [-Fetch] [-Json]"
     Write-Output "  forge update-frameworks [-Apply] [-Json]"
@@ -129,6 +130,14 @@ switch ($Command) {
         $args = @("-Prompt", $prompt, "-Mode", $mode)
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Resolve-ForgeRoute.ps1" -Arguments $args
+    }
+    "review" {
+        $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
+        $mode = if ([string]::IsNullOrWhiteSpace($Subcommand)) { "quick" } else { $Subcommand }
+        if ($mode -notin @("quick","build","fix","full","ship","full-auto")) { $mode = "quick" }
+        $args = @("-RepoPath", $RepoPath, "-Prompt", $prompt, "-Mode", $mode)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Resolve-ForgeReviewPlan.ps1" -Arguments $args
     }
     "ce" {
         $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }

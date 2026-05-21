@@ -492,6 +492,24 @@ forge upstreams -Full -Json
 - GSD 只在 L4/ship/handoff 负责状态交接和 next actions。
 - gstack 只做 review/QA/ship gate，不做主规划。
 
+
+## Review 分工与 Codex 插件
+
+Forge review 阶段默认把 Claude Code 内的代码审计交给 OpenAI Codex 插件：
+
+- 默认 diff/code review：Claude Code 中运行 `/codex:review`。
+- 高风险专项审查：认证、安全、数据库 schema、迁移、共享契约、跨模块等场景追加 CE `ce-code-review`。
+- ship/release gate：发布、交付、final/QA/canary/benchmark 场景追加 `gstack gate`。
+- 机器门禁：所有 review plan 最后都跑 `forge verify -RepoPath <repo> -Full`。
+
+CLI 入口：
+
+```powershell
+forge review -RepoPath <repo> -Title "Task prompt" -Subcommand <quick|build|fix|full|ship|full-auto> -Json
+```
+
+`forge review` 只生成可审计计划，不替代 Claude Code 插件交互；真正审查在 Claude Code 会话里执行 `/codex:review`。
+
 ## Framework upstream 自动更新
 
 `forge update-frameworks` 默认只审计，不改文件：
