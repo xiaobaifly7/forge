@@ -150,3 +150,19 @@ Forge 默认不要求用户记斜杠命令。
 
 
 
+
+## Compound Engineering 自动启用策略
+
+CE 现在不是默认全流程接管，而是 **按需自动启用**：
+
+- 用户显式点名 `/ce-*`、`$ce-*`、`/lfg` 或“用 CE”时启用。
+- `ship/release/handoff/M1 done` 阶段自动建议 `ce-compound` 做沉淀。
+- 出现 `review/code review/PR/反馈/浏览器测试` 信号时自动建议对应 CE 白名单能力。
+- 出现 `debug/排查/根因/复现` 信号时自动建议 `ce-debug`。
+- `full/guided-full` 任务结束并出现 `复盘/沉淀/learnings/可复用经验` 信号时自动建议 `ce-compound`。
+
+自动启用只限白名单能力，不允许 CE 自动接管 BMAD 主规划或 Forge 主执行链。检查命令：
+
+```powershell
+forge ce -Title "准备发布这个版本，做 release handoff 和复盘沉淀" -Subcommand ship -Json
+```

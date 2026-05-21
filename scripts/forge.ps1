@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "ce", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -39,6 +39,7 @@ function Show-ForgeHelp {
     Write-Output "  forge install -RepoPath <repo>"
     Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
     Write-Output "  forge workflows [-RepoPath .] [-Json]"
+    Write-Output "  forge ce -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge version [-FixDrift]"
 }
 
@@ -117,6 +118,17 @@ switch ($Command) {
         $args = @("-RepoPath", $RepoPath)
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Test-ForgeWorkflowEntrypoints.ps1" -Arguments $args
+    }
+    "ce" {
+        $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
+        $mode = if ([string]::IsNullOrWhiteSpace($Subcommand)) { "quick" } else { $Subcommand }
+        if ($mode -notin @("quick","build","fix","full","ship","full-auto")) { $mode = "quick" }
+        $execJson = & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ScriptDir "Resolve-ForgeExecutionMode.ps1") -Prompt $prompt -Mode $mode -Json
+        $exec = "audit-only"
+        try { $exec = [string](($execJson | ConvertFrom-Json).execution) } catch {}
+        $args = @("-Prompt", $prompt, "-Mode", $mode, "-Execution", $exec)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Resolve-ForgeCeActivation.ps1" -Arguments $args
     }
     "version" {
         Write-Output "forge_repo=$RepoRoot"
