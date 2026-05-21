@@ -465,3 +465,29 @@ Forge 先判定 `mode=quick|build|fix|full|ship|full-auto`，再用 `Resolve-For
 ```text
 [FORGE] execution=<guided-full|auto|audit-only|full-auto> explicit=<true|false> reason=<reason>
 ```
+
+## Forge unified route 输出
+
+`forge route` 是统一控制面入口。它一次性输出：
+
+- `level`：L0-L4
+- `mode`：quick/build/fix/full/ship/full-auto
+- `execution`：audit-only/auto/guided-full/full-auto
+- `frameworks`：BMAD、Superpowers、CE、GSD、gstack 是否参与
+- `ce_commands`：按需启用的 CE 白名单能力
+- `reasons`：触发依据
+
+示例：
+
+```powershell
+forge route -Title "准备发布这个版本，做 release handoff 和复盘沉淀" -Subcommand ship -Json
+forge upstreams -Full -Json
+```
+
+边界：
+
+- BMAD 只在 L3/L4/full 做规划主骨架。
+- Superpowers 负责执行纪律，不替代 BMAD 规划。
+- CE 只按需启用专项白名单能力：debug、review、PR feedback、browser test、compound learning。
+- GSD 只在 L4/ship/handoff 负责状态交接和 next actions。
+- gstack 只做 review/QA/ship gate，不做主规划。

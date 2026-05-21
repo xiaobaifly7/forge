@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "ce", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "ce", "upstreams", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -39,7 +39,9 @@ function Show-ForgeHelp {
     Write-Output "  forge install -RepoPath <repo>"
     Write-Output "  forge sync-all [-RepoPath <repo>] [-SearchRoot <dir>] [-RegistryPath <file>] [-Apply] [-Json]"
     Write-Output "  forge workflows [-RepoPath .] [-Json]"
+    Write-Output "  forge route -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge ce -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
+    Write-Output "  forge upstreams [-Fetch] [-Json]"
     Write-Output "  forge version [-FixDrift]"
 }
 
@@ -119,6 +121,14 @@ switch ($Command) {
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Test-ForgeWorkflowEntrypoints.ps1" -Arguments $args
     }
+    "route" {
+        $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
+        $mode = if ([string]::IsNullOrWhiteSpace($Subcommand)) { "quick" } else { $Subcommand }
+        if ($mode -notin @("quick","build","fix","full","ship","full-auto")) { $mode = "quick" }
+        $args = @("-Prompt", $prompt, "-Mode", $mode)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Resolve-ForgeRoute.ps1" -Arguments $args
+    }
     "ce" {
         $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
         $mode = if ([string]::IsNullOrWhiteSpace($Subcommand)) { "quick" } else { $Subcommand }
@@ -129,6 +139,12 @@ switch ($Command) {
         $args = @("-Prompt", $prompt, "-Mode", $mode, "-Execution", $exec)
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Resolve-ForgeCeActivation.ps1" -Arguments $args
+    }
+    "upstreams" {
+        $args = @()
+        if ($Full -or $Apply) { $args += "-Fetch" }
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Test-ForgeUpstreams.ps1" -Arguments $args
     }
     "version" {
         Write-Output "forge_repo=$RepoRoot"
