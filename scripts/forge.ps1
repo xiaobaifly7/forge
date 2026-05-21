@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "ce", "upstreams", "version", "help")]
+    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "ce", "upstreams", "update-frameworks", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -42,6 +42,7 @@ function Show-ForgeHelp {
     Write-Output "  forge route -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge ce -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge upstreams [-Fetch] [-Json]"
+    Write-Output "  forge update-frameworks [-Apply] [-Json]"
     Write-Output "  forge version [-FixDrift]"
 }
 
@@ -145,6 +146,12 @@ switch ($Command) {
         if ($Full -or $Apply) { $args += "-Fetch" }
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Test-ForgeUpstreams.ps1" -Arguments $args
+    }
+    "update-frameworks" {
+        $args = @()
+        if ($Apply) { $args += "-Apply" }
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Update-ForgeFrameworks.ps1" -Arguments $args
     }
     "version" {
         Write-Output "forge_repo=$RepoRoot"

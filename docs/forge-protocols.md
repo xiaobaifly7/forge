@@ -491,3 +491,26 @@ forge upstreams -Full -Json
 - CE 只按需启用专项白名单能力：debug、review、PR feedback、browser test、compound learning。
 - GSD 只在 L4/ship/handoff 负责状态交接和 next actions。
 - gstack 只做 review/QA/ship gate，不做主规划。
+
+## Framework upstream 自动更新
+
+`forge update-frameworks` 默认只审计，不改文件：
+
+```powershell
+forge update-frameworks -Json
+```
+
+明确 `-Apply` 才执行 `git pull --ff-only`：
+
+```powershell
+forge update-frameworks -Apply -Json
+```
+
+安全门禁：
+
+- 缺 upstream：停止。
+- dirty：停止。
+- ahead：停止。
+- 非 fast-forward：停止。
+- gstack 检测到本地 patch 标记：停止并要求人工 review。
+- Apply 后自动跑 workflows / doctor / verify -Full。
