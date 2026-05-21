@@ -35,6 +35,73 @@ function Install-ForgeUserRoot {
   Copy-ForgeTree -Source (Join-Path $RepoRoot "scripts") -Destination (Join-Path $UserRoot "scripts")
 }
 
+function Add-ForgeCodexHookEntry {
+  param(
+    [Parameter(Mandatory=$true)][hashtable]$Hooks,
+    [Parameter(Mandatory=$true)][string]$EventName,
+    [Parameter(Mandatory=$true)][string]$Command,
+    [string]$Matcher = "",
+    [int]$Timeout = 30,
+    [string]$StatusMessage = "Forge hook"
+  )
+
+  if (-not $Hooks.ContainsKey($EventName) -or $null -eq $Hooks[$EventName]) {
+    $Hooks[$EventName] = @()
+  }
+  $existing = @($Hooks[$EventName])
+  foreach ($entry in $existing) {
+    foreach ($hook in @($entry.hooks)) {
+      if ([string]$hook.command -eq $Command) { return }
+    }
+  }
+  $Hooks[$EventName] = @(
+    @([ordered]@{
+      matcher = $Matcher
+      hooks = @(
+        [ordered]@{
+          type = "command"
+          command = $Command
+          timeout = $Timeout
+          statusMessage = $StatusMessage
+        }
+      )
+    }) + $existing
+  )
+}
+
+function Install-ForgeCodexHooks {
+  param(
+    [Parameter(Mandatory=$true)][string]$CodexRoot
+  )
+
+  New-Item -ItemType Directory -Force -Path $CodexRoot | Out-Null
+  $hooksPath = Join-Path $CodexRoot "hooks.json"
+  $configPath = Join-Path $CodexRoot "config.toml"
+  $data = [ordered]@{ hooks = [ordered]@{} }
+  if (Test-Path -LiteralPath $hooksPath) {
+    try { $data = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable } catch {}
+    if (-not $data.ContainsKey("hooks") -or $null -eq $data.hooks) { $data["hooks"] = [ordered]@{} }
+  }
+
+  $shim = Join-Path $CodexRoot "scripts\forge-codex-hook.ps1"
+  $preCommand = "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$shim`" -Event pretooluse"
+  $sessionCommand = "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$shim`" -Event sessionstart"
+  $stopCommand = "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$shim`" -Event stop"
+  Add-ForgeCodexHookEntry -Hooks $data.hooks -EventName "PreToolUse" -Matcher "local_shell|shell|shell_command|exec_command|Bash|Shell|apply_patch|Edit|Write|MultiEdit" -Command $preCommand -Timeout 10 -StatusMessage "Forge PreToolUse guard"
+  Add-ForgeCodexHookEntry -Hooks $data.hooks -EventName "SessionStart" -Matcher "startup|resume" -Command $sessionCommand -Timeout 10 -StatusMessage "Forge SessionStart audit"
+  Add-ForgeCodexHookEntry -Hooks $data.hooks -EventName "Stop" -Matcher "" -Command $stopCommand -Timeout 15 -StatusMessage "Forge Stop audit"
+
+  $data | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $hooksPath -Encoding UTF8
+
+  $configText = if (Test-Path -LiteralPath $configPath) { Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 } else { "" }
+  if ($configText -notmatch '(?m)^\s*hooks\s*=\s*true\s*$') {
+    Add-Content -LiteralPath $configPath -Encoding UTF8 -Value "hooks = true"
+  }
+  if ($configText -notmatch '(?m)^\s*codex_hooks\s*=\s*true\s*$') {
+    Add-Content -LiteralPath $configPath -Encoding UTF8 -Value "codex_hooks = true"
+  }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceInfoCandidates = @(
   (Join-Path $ClaudeRoot "forge-source.txt"),
@@ -58,6 +125,7 @@ $projectClaude = Join-Path $resolvedRepoPath ".claude"
 
 Install-ForgeUserRoot -UserRoot $ClaudeRoot -RepoRoot $repoRoot
 Install-ForgeUserRoot -UserRoot $CodexRoot -RepoRoot $repoRoot
+Install-ForgeCodexHooks -CodexRoot $CodexRoot
 
 $installProjectHooks = -not ([System.IO.Path]::GetFullPath($resolvedRepoPath).TrimEnd('\', '/') -ieq [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/'))
 if ($installProjectHooks) {
