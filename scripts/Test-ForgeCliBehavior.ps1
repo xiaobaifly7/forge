@@ -36,6 +36,16 @@ function Assert-Behavior {
 $version = Invoke-Cli -Arguments @("version", "-FixDrift")
 Assert-Behavior -Name "version_fix_drift" -Ok ($version.exit_code -eq 0 -and $version.output -match "forge_source_drift=false" -and $version.output -match "forge_source_drift_fix=not_needed") -Details $version.output
 
+
+$statusJson = Invoke-Cli -Arguments @("status", "-RepoPath", $RepoRoot, "-Json")
+$statusParsed = $null
+try { $statusParsed = $statusJson.output | ConvertFrom-Json } catch {}
+Assert-Behavior -Name "status_json_is_clean" -Ok ($statusParsed -and $statusParsed.project.doctor_ok -and $statusParsed.project.verify_ok) -Details $statusJson.output
+
+$reviewCurrentJson = Invoke-Cli -Arguments @("review-current", "-RepoPath", $RepoRoot, "-Json")
+$reviewCurrentParsed = $null
+try { $reviewCurrentParsed = $reviewCurrentJson.output | ConvertFrom-Json } catch {}
+Assert-Behavior -Name "review_current_json_shape" -Ok ($reviewCurrentJson.exit_code -eq 0 -and $reviewCurrentParsed -and $reviewCurrentParsed.review_prompt -and $reviewCurrentParsed.plan.steps.Count -ge 1) -Details $reviewCurrentJson.output
 $verifyJson = Invoke-Cli -Arguments @("verify", "-RepoPath", $RepoRoot, "-SkipSmoke", "-Json")
 $parsed = $null
 try { $parsed = $verifyJson.output | ConvertFrom-Json } catch {}

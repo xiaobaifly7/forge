@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "review", "ce", "upstreams", "update-frameworks", "version", "help")]
+    [ValidateSet("status", "doctor", "task", "verify", "smoke", "install", "sync-all", "projects", "workflows", "route", "review", "review-current", "ce", "upstreams", "update-frameworks", "version", "help")]
     [string]$Command = "help",
 
     [Parameter(Position = 1)]
@@ -32,6 +32,7 @@ function Show-ForgeHelp {
     Write-Output "Forge CLI"
     Write-Output ""
     Write-Output "Usage:"
+    Write-Output "  forge status [-RepoPath .] [-Json]"
     Write-Output "  forge doctor [-RepoPath .] [-Json]"
     Write-Output "  forge task new -Title `"Fix bug`" [-Name task-slug] [-RepoPath .] [-Json]"
     Write-Output "  forge verify [-RepoPath .] [-PrNumber 1] [-SkipSmoke] [-Full] [-Strict] [-Json]"
@@ -41,6 +42,7 @@ function Show-ForgeHelp {
     Write-Output "  forge workflows [-RepoPath .] [-Json]"
     Write-Output "  forge route -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge review [-RepoPath .] [-Title `"Task prompt`"] [-Subcommand <mode>] [-Json]"
+    Write-Output "  forge review-current [-RepoPath .] [-Title `"Task prompt`"] [-Subcommand <mode>] [-Json]"
     Write-Output "  forge ce -Title `"Task prompt`" [-Subcommand <mode>] [-Json]"
     Write-Output "  forge upstreams [-Fetch] [-Json]"
     Write-Output "  forge update-frameworks [-Apply] [-Json]"
@@ -57,6 +59,11 @@ function Invoke-ForgeScript {
 }
 
 switch ($Command) {
+    "status" {
+        $args = @("-RepoPath", $RepoPath)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Get-ForgeStatus.ps1" -Arguments $args
+    }
     "doctor" {
         $args = @("-Mode", "Quick", "-RepoPath", $RepoPath)
         if ($Json) { $args += "-Json" }
@@ -138,6 +145,14 @@ switch ($Command) {
         $args = @("-RepoPath", $RepoPath, "-Prompt", $prompt, "-Mode", $mode)
         if ($Json) { $args += "-Json" }
         Invoke-ForgeScript -Name "Resolve-ForgeReviewPlan.ps1" -Arguments $args
+    }
+    "review-current" {
+        $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
+        $mode = if ([string]::IsNullOrWhiteSpace($Subcommand)) { "quick" } else { $Subcommand }
+        if ($mode -notin @("quick","build","fix","full","ship","full-auto")) { $mode = "quick" }
+        $args = @("-RepoPath", $RepoPath, "-Title", $prompt, "-Mode", $mode)
+        if ($Json) { $args += "-Json" }
+        Invoke-ForgeScript -Name "Invoke-ForgeCurrentReview.ps1" -Arguments $args
     }
     "ce" {
         $prompt = if ([string]::IsNullOrWhiteSpace($Title)) { $Subcommand } else { $Title }
